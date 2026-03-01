@@ -108,6 +108,19 @@ node ace serve --help
 
 Here are some of the most commonly used Ace commands:
 
+### Package Management
+
+```bash
+# Install and configure a package
+node ace add @adonisjs/lucid
+
+# Install multiple packages
+node ace add @adonisjs/lucid @adonisjs/auth
+
+# Configure an already installed package
+node ace configure @adonisjs/lucid
+```
+
 ### Development
 
 ```bash
@@ -116,6 +129,9 @@ node ace serve --watch
 
 # Start development server with HMR
 node ace serve --hmr
+
+# Build for production
+node ace build
 ```
 
 ### Testing
@@ -150,11 +166,20 @@ node ace make:service UserService
 # List all routes
 node ace list:routes
 
+# Add environment variable
+node ace env:add MY_VAR
+
 # Generate application key
 node ace generate:key
 
+# Inspect RC file configuration
+node ace inspect:rcfile
+
 # Open REPL
 node ace repl
+
+# Eject a stub file
+node ace eject make/controller
 ```
 
 ## Ace Architecture

@@ -487,3 +487,75 @@ const badToken = VerificationToken.createTransientToken(
   '30 days'   // Too long!
 )
 ```
+
+## Dumper Module
+
+The dumper module provides debugging and inspection utilities for formatting and displaying data:
+
+```ts
+import { Dumper, defineConfig } from '@adonisjs/core/dumper'
+```
+
+### Creating a Dumper
+
+```ts
+const dumper = await app.container.make('dumper')
+
+// Or create manually
+import { Dumper } from '@adonisjs/core/dumper'
+const dumper = new Dumper(app)
+```
+
+### Dumping to HTML
+
+Format data for browser display:
+
+```ts
+const user = { id: 1, name: 'John', email: 'john@example.com' }
+const htmlOutput = dumper.dumpToHtml(user, { title: 'User Data' })
+
+// In a controller
+response.header('content-type', 'text/html')
+response.send(htmlOutput)
+```
+
+### Dumping to Console
+
+Format data for terminal output with ANSI colors:
+
+```ts
+const ansiOutput = dumper.dumpToAnsi(user, { title: 'Debug User' })
+console.log(ansiOutput)
+```
+
+### Configuration
+
+Configure dumper output in your application:
+
+```ts
+import { defineConfig } from '@adonisjs/core/dumper'
+
+export default defineConfig({
+  html: {
+    showHidden: true,
+    depth: 5,
+  },
+  console: {
+    collapse: ['Date', 'DateTime'],
+  },
+})
+```
+
+### Dump and Die
+
+Use the `dd()` helper for quick debugging (requires dumper service):
+
+```ts
+import { dd } from '@adonisjs/core/dumper'
+
+dd(user, request, response) // Dumps and exits
+```
+
+<Note>
+The dumper module is particularly useful for debugging complex objects, inspecting request/response data, and formatting output for error pages.
+</Note>
