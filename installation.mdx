@@ -1,0 +1,348 @@
+---
+title: "Installation"
+description: "Install AdonisJS Core and set up your development environment"
+---
+
+## Prerequisites
+
+Before installing AdonisJS Core, ensure you have the following:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Version 24.0.0 or higher**
+    
+    Download from [nodejs.org](https://nodejs.org/)
+  </Card>
+  
+  <Card title="Package Manager" icon="box">
+    **npm**, **yarn**, or **pnpm**
+    
+    Comes with Node.js or install separately
+  </Card>
+</CardGroup>
+
+<Warning>
+  AdonisJS Core requires Node.js **24.0.0 or higher**. Using an older version will result in compatibility issues.
+</Warning>
+
+## Install AdonisJS Core
+
+Install the `@adonisjs/core` package using your preferred package manager:
+
+<CodeGroup>
+
+```bash npm
+npm install @adonisjs/core
+```
+
+```bash yarn
+yarn add @adonisjs/core
+```
+
+```bash pnpm
+pnpm add @adonisjs/core
+```
+
+</CodeGroup>
+
+<Info>
+  The `@adonisjs/core` package includes all the essential modules you need to build web applications, including HTTP server, routing, middleware, config management, and more.
+</Info>
+
+## Install Optional Dependencies
+
+Depending on your application requirements, you may want to install these optional peer dependencies:
+
+### Development Tools
+
+For hot module reloading and TypeScript compilation:
+
+<CodeGroup>
+
+```bash npm
+npm install --save-dev @adonisjs/assembler
+```
+
+```bash yarn
+yarn add --dev @adonisjs/assembler
+```
+
+```bash pnpm
+pnpm add -D @adonisjs/assembler
+```
+
+</CodeGroup>
+
+### Password Hashing
+
+For secure password hashing using Argon2 or Bcrypt:
+
+<Tabs>
+  <Tab title="Argon2 (Recommended)">
+    <CodeGroup>
+    
+    ```bash npm
+    npm install argon2
+    ```
+    
+    ```bash yarn
+    yarn add argon2
+    ```
+    
+    ```bash pnpm
+    pnpm add argon2
+    ```
+    
+    </CodeGroup>
+    
+    <Tip>
+      Argon2 is the recommended hashing algorithm as it won the Password Hashing Competition in 2015.
+    </Tip>
+  </Tab>
+  
+  <Tab title="Bcrypt">
+    <CodeGroup>
+    
+    ```bash npm
+    npm install bcrypt
+    ```
+    
+    ```bash yarn
+    yarn add bcrypt
+    ```
+    
+    ```bash pnpm
+    pnpm add bcrypt
+    ```
+    
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+### Validation
+
+For request validation with VineJS:
+
+<CodeGroup>
+
+```bash npm
+npm install @vinejs/vine
+```
+
+```bash yarn
+yarn add @vinejs/vine
+```
+
+```bash pnpm
+pnpm add @vinejs/vine
+```
+
+</CodeGroup>
+
+### Template Engine
+
+For server-side rendering with Edge templates:
+
+<CodeGroup>
+
+```bash npm
+npm install edge.js
+```
+
+```bash yarn
+yarn add edge.js
+```
+
+```bash pnpm
+pnpm add edge.js
+```
+
+</CodeGroup>
+
+### Error Handling
+
+For beautiful error pages in development:
+
+<CodeGroup>
+
+```bash npm
+npm install youch
+```
+
+```bash yarn
+yarn add youch
+```
+
+```bash pnpm
+pnpm add youch
+```
+
+</CodeGroup>
+
+### Pretty Logging
+
+For formatted console output during development:
+
+<CodeGroup>
+
+```bash npm
+npm install pino-pretty
+```
+
+```bash yarn
+yarn add pino-pretty
+```
+
+```bash pnpm
+pnpm add pino-pretty
+```
+
+</CodeGroup>
+
+## TypeScript Configuration
+
+AdonisJS is built with TypeScript. Create a `tsconfig.json` file in your project root:
+
+```json tsconfig.json
+{
+  "extends": "@adonisjs/tsconfig/tsconfig.app.json",
+  "compilerOptions": {
+    "rootDir": "./",
+    "outDir": "./build"
+  }
+}
+```
+
+<Info>
+  The `@adonisjs/tsconfig` package provides recommended TypeScript configurations. Install it with `npm install --save-dev @adonisjs/tsconfig`.
+</Info>
+
+## Package.json Setup
+
+Update your `package.json` to use ES modules:
+
+```json package.json
+{
+  "name": "my-adonisjs-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --import=@poppinss/ts-exec bin/server.ts",
+    "build": "tsc",
+    "start": "node build/bin/server.js"
+  }
+}
+```
+
+<Note>
+  Setting `"type": "module"` enables ES module syntax (import/export) in your project.
+</Note>
+
+## Project Structure
+
+Create a basic project structure:
+
+```
+my-adonisjs-app/
+├── bin/
+│   └── server.ts          # HTTP server entry point
+├── app/
+│   ├── controllers/       # HTTP controllers
+│   └── middleware/        # HTTP middleware
+├── config/
+│   └── app.ts            # Application configuration
+├── start/
+│   └── routes.ts         # Route definitions
+├── package.json
+└── tsconfig.json
+```
+
+<Tip>
+  You can customize this structure to fit your needs. AdonisJS is flexible and doesn't enforce a specific directory layout.
+</Tip>
+
+## Verification
+
+Verify your installation by checking the installed version:
+
+<CodeGroup>
+
+```bash npm
+npm list @adonisjs/core
+```
+
+```bash yarn
+yarn list @adonisjs/core
+```
+
+```bash pnpm
+pnpm list @adonisjs/core
+```
+
+</CodeGroup>
+
+You should see output similar to:
+
+```
+@adonisjs/core@7.0.0
+```
+
+## Next Steps
+
+Now that you have AdonisJS Core installed, you're ready to build your first application:
+
+<CardGroup cols={2}>
+  <Card 
+    title="Quick Start Guide" 
+    icon="rocket" 
+    href="/quickstart"
+  >
+    Create your first HTTP server with AdonisJS
+  </Card>
+  
+  <Card 
+    title="Architecture Overview" 
+    icon="sitemap" 
+    href="/architecture/overview"
+  >
+    Learn about the core concepts and architecture
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Node.js version error" icon="exclamation-triangle">
+    If you see an error about Node.js version, ensure you're running Node.js 24.0.0 or higher:
+    
+    ```bash
+    node --version
+    ```
+    
+    If you need to upgrade, download the latest version from [nodejs.org](https://nodejs.org/) or use a version manager like [nvm](https://github.com/nvm-sh/nvm).
+  </Accordion>
+  
+  <Accordion title="Native module compilation errors" icon="hammer">
+    Some packages like `argon2` and `bcrypt` require native compilation. Ensure you have:
+    
+    - **Python** (for node-gyp)
+    - **C++ build tools** (Visual Studio Build Tools on Windows, gcc on Linux, Xcode on macOS)
+    
+    On Windows, you can install build tools with:
+    ```bash
+    npm install --global windows-build-tools
+    ```
+  </Accordion>
+  
+  <Accordion title="Import errors with TypeScript" icon="file-code">
+    If you encounter import errors, ensure:
+    
+    1. Your `tsconfig.json` has `"module": "ESNext"` or `"module": "NodeNext"`
+    2. Your `package.json` has `"type": "module"`
+    3. You're using `.js` extensions in your imports (TypeScript requirement for ES modules)
+  </Accordion>
+</AccordionGroup>
+
+<Card title="Need Help?" icon="life-ring" href="https://github.com/adonisjs/core/issues">
+  If you encounter issues not covered here, please open an issue on GitHub.
+</Card>

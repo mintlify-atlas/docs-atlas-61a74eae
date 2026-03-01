@@ -1,0 +1,473 @@
+---
+title: Test Utilities API
+description: Testing utilities for creating HTTP contexts, managing test servers, and handling cookies in AdonisJS test suites
+---
+
+The Test Utilities module provides a comprehensive set of tools for testing AdonisJS applications. It includes utilities for creating HTTP contexts, starting test servers, and managing cookies during tests.
+
+## Import
+
+```typescript
+import { TestUtils } from '@adonisjs/core/test_utils'
+```
+
+## TestUtils Class
+
+The main class for managing test utilities in AdonisJS applications.
+
+### Constructor
+
+Create a new TestUtils instance.
+
+<ParamField path="app" type="ApplicationService" required>
+  The application service instance
+</ParamField>
+
+```typescript
+import { TestUtils } from '@adonisjs/core/test_utils'
+
+const testUtils = new TestUtils(app)
+await testUtils.boot()
+```
+
+### Properties
+
+#### app
+
+Reference to the application service instance.
+
+<ParamField path="app" type="ApplicationService">
+  The application service passed to the constructor
+</ParamField>
+
+```typescript
+const app = testUtils.app
+```
+
+#### cookies
+
+Cookie client instance for handling cookies in tests.
+
+<ParamField path="cookies" type="CookieClient">
+  Instance for managing cookies during testing
+</ParamField>
+
+```typescript
+const encrypted = testUtils.cookies.encrypt('session_data')
+const decrypted = testUtils.cookies.decrypt(encrypted)
+```
+
+#### isBooted
+
+Check if test utils have been booted.
+
+<ParamField path="isBooted" type="boolean">
+  Returns true if boot() has been called
+</ParamField>
+
+```typescript
+if (!testUtils.isBooted) {
+  await testUtils.boot()
+}
+```
+
+### Methods
+
+#### boot
+
+Boot the test utilities. This must be called before using other methods.
+
+**Returns:** `Promise<void>`
+
+```typescript
+const testUtils = new TestUtils(app)
+await testUtils.boot()
+```
+
+<Note>
+The application must be booted and the container must have all bindings before calling this method.
+</Note>
+
+#### createHttpContext
+
+Create an HTTP context for testing.
+
+<ParamField path="options" type="object">
+  Optional configuration for creating HTTP context
+  
+  <ParamField path="options.req" type="IncomingMessage">
+    Custom Node.js IncomingMessage instance
+  </ParamField>
+  
+  <ParamField path="options.res" type="ServerResponse">
+    Custom Node.js ServerResponse instance
+  </ParamField>
+</ParamField>
+
+**Returns:** `Promise<HttpContext>` - HTTP context instance for testing
+
+```typescript
+// Create a default context
+const ctx = await testUtils.createHttpContext()
+
+// Create context with custom request/response
+import { IncomingMessage, ServerResponse } from 'node:http'
+import { Socket } from 'node:net'
+
+const req = new IncomingMessage(new Socket())
+const res = new ServerResponse(req)
+const ctx = await testUtils.createHttpContext({ req, res })
+
+// Use the context in tests
+ctx.request.method = 'POST'
+ctx.request.url = '/users'
+```
+
+#### httpServer
+
+Get an instance of HTTP server testing utilities.
+
+**Returns:** `HttpServerUtils` - Instance for managing test HTTP server
+
+```typescript
+const httpUtils = testUtils.httpServer()
+const closeServer = await httpUtils.start()
+
+// Make HTTP requests to test endpoints
+// ...
+
+await closeServer()
+```
+
+### Usage Example
+
+```typescript
+import { test } from '@japa/runner'
+import { TestUtils } from '@adonisjs/core/test_utils'
+
+test.group('Users', (group) => {
+  let testUtils: TestUtils
+  
+  group.setup(async () => {
+    testUtils = new TestUtils(app)
+    await testUtils.boot()
+  })
+  
+  test('can create http context', async ({ assert }) => {
+    const ctx = await testUtils.createHttpContext()
+    assert.exists(ctx.request)
+    assert.exists(ctx.response)
+  })
+})
+```
+
+## HttpServerUtils Class
+
+Utilities for starting and stopping the AdonisJS HTTP server during testing.
+
+### Constructor
+
+Creates a new HttpServerUtils instance.
+
+<ParamField path="utils" type="TestUtils" required>
+  The test utils instance
+</ParamField>
+
+```typescript
+const httpUtils = testUtils.httpServer()
+```
+
+<Note>
+You typically don't create this directly. Use `testUtils.httpServer()` instead.
+</Note>
+
+### Methods
+
+#### start
+
+Start the HTTP server for integration testing.
+
+<ParamField path="serverCallback" type="function">
+  Optional callback to create a custom HTTP server instance
+  
+  <ParamField path="handler" type="(req: IncomingMessage, res: ServerResponse) => any">
+    The request handler function
+  </ParamField>
+  
+  **Returns:** `NodeHttpsServer | NodeHttpServer` - Custom server instance
+</ParamField>
+
+**Returns:** `Promise<() => Promise<void>>` - Function to close the server
+
+```typescript
+import { test } from '@japa/runner'
+import supertest from 'supertest'
+
+test.group('API Tests', (group) => {
+  let closeServer: () => Promise<void>
+  
+  group.setup(async () => {
+    const httpUtils = testUtils.httpServer()
+    closeServer = await httpUtils.start()
+  })
+  
+  group.teardown(async () => {
+    await closeServer()
+  })
+  
+  test('GET /users returns 200', async () => {
+    const response = await supertest(process.env.HOST)
+      .get('/users')
+      .expect(200)
+  })
+})
+```
+
+#### Using with HTTPS
+
+```typescript
+import https from 'node:https'
+import fs from 'node:fs'
+
+const options = {
+  key: fs.readFileSync('test-key.pem'),
+  cert: fs.readFileSync('test-cert.pem')
+}
+
+const closeServer = await httpUtils.start((handler) => {
+  return https.createServer(options, handler)
+})
+```
+
+### Environment Variables
+
+The HTTP server uses the following environment variables:
+
+<ParamField path="HOST" type="string" default="0.0.0.0">
+  The host address to bind the server to
+</ParamField>
+
+<ParamField path="PORT" type="string" default="3333">
+  The port number to listen on
+</ParamField>
+
+```bash
+# .env.test
+HOST=127.0.0.1
+PORT=4000
+```
+
+## CookieClient
+
+The `CookieClient` class is available through `testUtils.cookies` and provides methods for encrypting and decrypting cookies.
+
+### encrypt
+
+Encrypt a cookie value.
+
+<ParamField path="value" type="string" required>
+  The cookie value to encrypt
+</ParamField>
+
+**Returns:** `string` - Encrypted cookie value
+
+```typescript
+const encrypted = testUtils.cookies.encrypt('user_session_data')
+```
+
+### decrypt
+
+Decrypt a cookie value.
+
+<ParamField path="value" type="string" required>
+  The encrypted cookie value to decrypt
+</ParamField>
+
+**Returns:** `string` - Decrypted cookie value
+
+```typescript
+const decrypted = testUtils.cookies.decrypt(encryptedValue)
+```
+
+### sign
+
+Sign a cookie value.
+
+<ParamField path="value" type="string" required>
+  The cookie value to sign
+</ParamField>
+
+**Returns:** `string` - Signed cookie value
+
+```typescript
+const signed = testUtils.cookies.sign('remember_token')
+```
+
+### unsign
+
+Unsign and verify a signed cookie.
+
+<ParamField path="value" type="string" required>
+  The signed cookie value to verify and unsign
+</ParamField>
+
+**Returns:** `string | null` - Unsigned value if valid, null if invalid
+
+```typescript
+const unsigned = testUtils.cookies.unsign(signedValue)
+if (unsigned) {
+  console.log('Valid cookie:', unsigned)
+}
+```
+
+## Testing Examples
+
+### Basic HTTP Context Testing
+
+```typescript
+import { test } from '@japa/runner'
+
+test('middleware sets user on context', async ({ assert }) => {
+  const ctx = await testUtils.createHttpContext()
+  
+  // Simulate request
+  ctx.request.method = 'GET'
+  ctx.request.url = '/profile'
+  
+  // Run middleware
+  await authMiddleware.handle(ctx, async () => {})
+  
+  assert.exists(ctx.auth.user)
+})
+```
+
+### Integration Testing with HTTP Server
+
+```typescript
+import { test } from '@japa/runner'
+import supertest from 'supertest'
+
+test.group('User API', (group) => {
+  let closeServer: () => Promise<void>
+  let baseUrl: string
+  
+  group.setup(async () => {
+    const testUtils = new TestUtils(app)
+    await testUtils.boot()
+    
+    const httpUtils = testUtils.httpServer()
+    closeServer = await httpUtils.start()
+    
+    baseUrl = `http://${process.env.HOST}:${process.env.PORT}`
+  })
+  
+  group.teardown(async () => {
+    await closeServer()
+  })
+  
+  test('can register new user', async ({ assert }) => {
+    const response = await supertest(baseUrl)
+      .post('/register')
+      .send({ email: 'test@example.com', password: 'secret' })
+      .expect(201)
+    
+    assert.exists(response.body.id)
+  })
+  
+  test('can login user', async ({ assert }) => {
+    const response = await supertest(baseUrl)
+      .post('/login')
+      .send({ email: 'test@example.com', password: 'secret' })
+      .expect(200)
+    
+    assert.exists(response.body.token)
+  })
+})
+```
+
+### Testing with Cookies
+
+```typescript
+import { test } from '@japa/runner'
+
+test('can encrypt and decrypt session cookie', async ({ assert }) => {
+  const testUtils = new TestUtils(app)
+  await testUtils.boot()
+  
+  const sessionData = JSON.stringify({ userId: 1, role: 'admin' })
+  const encrypted = testUtils.cookies.encrypt(sessionData)
+  const decrypted = testUtils.cookies.decrypt(encrypted)
+  
+  assert.equal(decrypted, sessionData)
+})
+
+test('can sign and verify remember token', async ({ assert }) => {
+  const testUtils = new TestUtils(app)
+  await testUtils.boot()
+  
+  const token = 'abc123'
+  const signed = testUtils.cookies.sign(token)
+  const unsigned = testUtils.cookies.unsign(signed)
+  
+  assert.equal(unsigned, token)
+})
+```
+
+### Testing Route Handlers
+
+```typescript
+import { test } from '@japa/runner'
+
+test('users controller returns user list', async ({ assert }) => {
+  const ctx = await testUtils.createHttpContext()
+  const controller = await app.container.make(UsersController)
+  
+  await controller.index(ctx)
+  
+  assert.equal(ctx.response.getStatus(), 200)
+  assert.isArray(ctx.response.getBody())
+})
+```
+
+## Best Practices
+
+1. **Always boot test utils** before using them:
+   ```typescript
+   const testUtils = new TestUtils(app)
+   await testUtils.boot()
+   ```
+
+2. **Clean up servers** after tests:
+   ```typescript
+   group.teardown(async () => {
+     await closeServer()
+   })
+   ```
+
+3. **Use environment variables** for test configuration:
+   ```typescript
+   // .env.test
+   HOST=127.0.0.1
+   PORT=4000
+   NODE_ENV=test
+   ```
+
+4. **Isolate test data** by using transactions or cleaning up after each test:
+   ```typescript
+   group.each.setup(async () => {
+     await Database.beginGlobalTransaction()
+   })
+   
+   group.each.teardown(async () => {
+     await Database.rollbackGlobalTransaction()
+   })
+   ```
+
+5. **Reuse test utils** across test groups when possible:
+   ```typescript
+   // tests/bootstrap.ts
+   export const testUtils = new TestUtils(app)
+   
+   // tests/users.spec.ts
+   import { testUtils } from './bootstrap.ts'
+   ```

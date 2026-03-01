@@ -1,0 +1,526 @@
+---
+title: Codemods
+description: API reference for the Codemods class used to programmatically modify AdonisJS source files
+---
+
+# Codemods
+
+Codemods class for programmatically modifying AdonisJS source files. This class provides APIs to modify configuration files, register middleware, generate stubs, and install packages.
+
+The codemod APIs rely on the `@adonisjs/assembler` package, which must be installed as a dependency in the user application.
+
+## Import
+
+```typescript
+import { Codemods } from '@adonisjs/core/ace'
+```
+
+## Constructor
+
+<ParamField path="app" type="Application" required>
+  The AdonisJS application instance
+</ParamField>
+
+<ParamField path="cliLogger" type="UIPrimitives['logger']" required>
+  CLI logger instance for displaying operation results
+</ParamField>
+
+### Example
+
+```typescript
+const codemods = new Codemods(app, logger)
+
+// Generate a controller from a stub
+await codemods.makeUsingStub(stubsRoot, 'controller.stub', {
+  filename: 'UserController',
+  entity: { name: 'User' }
+})
+
+// Install packages
+await codemods.installPackages([
+  { name: '@adonisjs/lucid', isDevDependency: false }
+])
+```
+
+## Properties
+
+<ParamField path="overwriteExisting" type="boolean">
+  Overwrite existing files when generating files from stubs. Default: `false`
+</ParamField>
+
+<ParamField path="verboseInstallOutput" type="boolean">
+  Display verbose logs for package installation. Default: `false`
+</ParamField>
+
+```typescript
+const codemods = new Codemods(app, logger)
+codemods.overwriteExisting = true
+codemods.verboseInstallOutput = true
+```
+
+## Methods
+
+### defineEnvVariables()
+
+Define one or more environment variables in the `.env` file.
+
+<ParamField path="environmentVariables" type="Record<string, string | number | boolean>" required>
+  Key-value pairs of environment variables to add
+</ParamField>
+
+<ParamField path="options" type="object">
+  Configuration options:
+  
+  - `omitFromExample?: Array<keyof T>` - Keys to exclude from `.env.example` file
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.defineEnvVariables({
+  DB_CONNECTION: 'mysql',
+  DB_HOST: 'localhost',
+  SECRET_KEY: 'abc123'
+}, {
+  omitFromExample: ['SECRET_KEY']
+})
+```
+
+### getTsMorphProject()
+
+Returns the TsMorph project instance for advanced AST manipulations. See [ts-morph documentation](https://ts-morph.com/) for more information.
+
+**Returns:** `Promise<CodeTransformer['project'] | undefined>`
+
+```typescript
+const project = await codemods.getTsMorphProject()
+if (project) {
+  const sourceFile = project.getSourceFile('app/controllers/user_controller.ts')
+  // Perform advanced AST operations
+}
+```
+
+### defineEnvValidations()
+
+Define validations for environment variables in the `start/env.ts` file. This method updates the environment validation schema using the assembler.
+
+<ParamField path="validations" type="EnvValidationNode" required>
+  Validation schema node for environment variables
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.defineEnvValidations({
+  NODE_ENV: 'Env.schema.enum(["development", "production", "test"] as const)',
+  PORT: 'Env.schema.number()',
+  HOST: 'Env.schema.string({ format: "host" })'
+})
+```
+
+### registerMiddleware()
+
+Register middleware in the `start/kernel.ts` file. This method adds middleware to the specified stack (server, router, or named).
+
+<ParamField path="stack" type="'server' | 'router' | 'named'" required>
+  The middleware stack to register to
+</ParamField>
+
+<ParamField path="middleware" type="MiddlewareNode[]" required>
+  Array of middleware nodes to register
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.registerMiddleware('server', [
+  {
+    name: 'cors',
+    path: '@adonisjs/cors/cors_middleware'
+  }
+])
+```
+
+#### MiddlewareNode Type
+
+```typescript
+type MiddlewareNode = {
+  name: string
+  path: string
+}
+```
+
+### registerPolicies()
+
+Register bouncer policies to the list of policies collection exported from the `app/policies/main.ts` file. This method adds new policy definitions to the policies export.
+
+<ParamField path="policies" type="BouncerPolicyNode[]" required>
+  Array of policy nodes to register
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.registerPolicies([
+  {
+    name: 'UserPolicy',
+    path: '#policies/user_policy'
+  }
+])
+```
+
+#### BouncerPolicyNode Type
+
+```typescript
+type BouncerPolicyNode = {
+  name: string
+  path: string
+}
+```
+
+### updateRcFile()
+
+Update the `adonisrc.ts` file with new configuration settings. This method allows modification of the AdonisJS runtime configuration.
+
+<ParamField path="transformer" type="(rcFile: RcFile) => void | Promise<void>" required>
+  Callback function that receives the RC file object for modification
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.updateRcFile((rcFile) => {
+  rcFile.addCommand('make:custom')
+  rcFile.addPreloadFile('#app/events/main')
+})
+```
+
+### registerVitePlugin()
+
+Register a new Vite plugin in the `vite.config.ts` file. This method adds plugin configuration to the Vite build configuration.
+
+<ParamField path="plugin" type="VitePluginNode" required>
+  Configuration for the Vite plugin to add
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.registerVitePlugin({
+  name: 'vue',
+  import: 'import vue from "@vitejs/plugin-vue"',
+  options: '()'
+})
+```
+
+### registerJapaPlugin()
+
+Register a new Japa plugin in the `tests/bootstrap.ts` file. This method adds plugin configuration to the test runner setup.
+
+<ParamField path="plugin" type="JapaPluginNode" required>
+  Configuration for the Japa plugin to add
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.registerJapaPlugin({
+  name: 'expect',
+  import: 'import { expect } from "@japa/expect"'
+})
+```
+
+### addValidator()
+
+Add a new validator file to the validators directory. This method creates a new validator file with the provided definition.
+
+<ParamField path="validatorFileName" type="string" required>
+  The filename for the validator (without extension)
+</ParamField>
+
+<ParamField path="exportName" type="string" required>
+  The name of the exported validator
+</ParamField>
+
+<ParamField path="contents" type="string" required>
+  The validator file contents
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.addValidator({
+  validatorFileName: 'create_user',
+  exportName: 'createUserValidator',
+  contents: 'export const createUserValidator = vine.compile(...)'
+})
+```
+
+### addLimiter()
+
+Add a new rate limiter file to the limiters directory. This method creates a new limiter file with the provided definition.
+
+<ParamField path="limiterFileName" type="string" required>
+  The filename for the limiter (without extension)
+</ParamField>
+
+<ParamField path="exportName" type="string" required>
+  The name of the exported limiter
+</ParamField>
+
+<ParamField path="contents" type="string" required>
+  The limiter file contents
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.addLimiter({
+  limiterFileName: 'api_throttle',
+  exportName: 'apiThrottleLimiter',
+  contents: 'export const apiThrottleLimiter = limiter.define(...)'
+})
+```
+
+### addModelMixins()
+
+Add mixins to a model class. This method adds mixin calls to the specified model file.
+
+<ParamField path="modelFileName" type="string" required>
+  The model filename (e.g., 'user')
+</ParamField>
+
+<ParamField path="mixins" type="ModelMixinNode[]" required>
+  Array of mixin configurations to add
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.addModelMixins('user', [
+  {
+    name: 'SoftDeletes',
+    importPath: '@adonisjs/lucid/mixins/soft_deletes',
+    importType: 'named'
+  }
+])
+```
+
+#### ModelMixinNode Type
+
+```typescript
+type ModelMixinNode = {
+  name: string
+  importPath: string
+  importType: 'default' | 'named'
+}
+```
+
+### addControllerMethod()
+
+Add a new method to an existing controller class. This method injects a new method into the specified controller file.
+
+<ParamField path="controllerFileName" type="string" required>
+  The controller filename (e.g., 'users_controller')
+</ParamField>
+
+<ParamField path="className" type="string" required>
+  The controller class name (e.g., 'UsersController')
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  The method name to add
+</ParamField>
+
+<ParamField path="contents" type="string" required>
+  The method implementation code
+</ParamField>
+
+<ParamField path="imports" type="ImportNode[]">
+  Array of imports required by the new method
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.addControllerMethod({
+  controllerFileName: 'users_controller',
+  className: 'UsersController',
+  name: 'destroy',
+  contents: 'async destroy({ params, response }: HttpContext) { ... }',
+  imports: [
+    { isType: false, isNamed: true, name: 'HttpContext', path: '@adonisjs/core/http' }
+  ]
+})
+```
+
+### makeUsingStub()
+
+Generate a file using a stub template.
+
+<ParamField path="stubsRoot" type="string" required>
+  Root directory containing stub files
+</ParamField>
+
+<ParamField path="stubPath" type="string" required>
+  Path to the specific stub file
+</ParamField>
+
+<ParamField path="stubState" type="Record<string, any>" required>
+  Template variables for stub generation
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional configuration:
+  
+  - `contentsFromFile?: string` - Override stub contents with file contents
+</ParamField>
+
+**Returns:** `Promise<GeneratedStub>`
+
+```typescript
+const result = await codemods.makeUsingStub(
+  './stubs',
+  'controller.stub',
+  {
+    filename: 'UserController',
+    entity: { name: 'User', modelName: 'User' },
+    resourceful: true
+  }
+)
+
+console.log(result.destination) // Full path to generated file
+console.log(result.relativeFileName) // Relative path from app root
+console.log(result.status) // 'created' | 'skipped'
+```
+
+#### GeneratedStub Type
+
+```typescript
+type GeneratedStub = {
+  destination: string
+  relativeFileName: string
+  status: 'created' | 'skipped'
+  skipReason?: string
+}
+```
+
+### installPackages()
+
+Install packages using the detected or specified package manager. Automatically detects npm, yarn, or pnpm and installs dependencies accordingly.
+
+You can specify version of each package by setting it in the name like `@adonisjs/lucid@^20.0.0`.
+
+<ParamField path="packages" type="Array<{ name: string; isDevDependency: boolean }>" required>
+  Array of packages with their dependency type
+</ParamField>
+
+<ParamField path="packageManager" type="SupportedPackageManager">
+  Optional package manager to use (auto-detected if not provided). Options: `'npm'`, `'yarn'`, `'yarn@berry'`, `'pnpm'`, `'pnpm@6'`, `'deno'`
+</ParamField>
+
+**Returns:** `Promise<boolean>`
+
+```typescript
+const success = await codemods.installPackages([
+  { name: '@adonisjs/lucid', isDevDependency: false },
+  { name: '@types/node', isDevDependency: true }
+])
+
+if (success) {
+  console.log('Packages installed successfully')
+}
+```
+
+### listPackagesToInstall()
+
+List the packages that should be installed manually. This method displays installation commands for different package managers when automatic installation is not available or desired.
+
+<ParamField path="packages" type="Array<{ name: string; isDevDependency: boolean }>" required>
+  Array of packages with their dependency type
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+```typescript
+await codemods.listPackagesToInstall([
+  { name: '@adonisjs/lucid', isDevDependency: false },
+  { name: '@types/node', isDevDependency: true }
+])
+
+// Output:
+// Please install following packages
+// npm i -D @types/node
+// npm i @adonisjs/lucid
+```
+
+## Events
+
+The `Codemods` class extends `EventEmitter` and emits the following events:
+
+### error
+
+Emitted when a codemod operation fails.
+
+```typescript
+const codemods = new Codemods(app, logger)
+
+codemods.on('error', (error) => {
+  console.error('Codemod operation failed:', error)
+})
+
+await codemods.registerMiddleware('server', [...])
+```
+
+## Complete Example
+
+```typescript
+import { BaseCommand } from '@adonisjs/core/ace'
+
+export default class ConfigureDatabase extends BaseCommand {
+  static commandName = 'configure:database'
+
+  async run() {
+    const codemods = await this.createCodemods()
+    
+    // Define environment variables
+    await codemods.defineEnvVariables({
+      DB_CONNECTION: 'mysql',
+      DB_HOST: 'localhost',
+      DB_PORT: 3306
+    })
+
+    // Define environment validations
+    await codemods.defineEnvValidations({
+      DB_CONNECTION: 'Env.schema.string()',
+      DB_HOST: 'Env.schema.string({ format: "host" })',
+      DB_PORT: 'Env.schema.number()'
+    })
+
+    // Install packages
+    const installed = await codemods.installPackages([
+      { name: '@adonisjs/lucid', isDevDependency: false },
+      { name: 'mysql2', isDevDependency: false }
+    ])
+
+    if (installed) {
+      // Generate migration
+      await codemods.makeUsingStub(
+        './stubs',
+        'migration.stub',
+        {
+          filename: 'create_users_table',
+          tableName: 'users'
+        }
+      )
+
+      this.logger.success('Database configured successfully')
+    }
+  }
+}
+```
+
+## See Also
+
+- [Kernel API](/api/ace/kernel) - Manage and execute commands
+- [Command API](/api/ace/command) - Create custom Ace commands

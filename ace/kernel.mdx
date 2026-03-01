@@ -1,0 +1,461 @@
+---
+title: Ace Kernel
+description: Learn about the Ace Kernel, how it manages command registration, execution lifecycle, and integration with the AdonisJS application
+---
+
+The Ace Kernel is the core component that manages the lifecycle of CLI commands in AdonisJS. It handles command registration, parsing command-line arguments, executing commands, and managing the overall command execution environment.
+
+## Introduction
+
+The `Kernel` class extends the base Ace kernel from `@adonisjs/ace` and adds AdonisJS-specific functionality like:
+
+- Integration with the IoC container for dependency injection
+- Access to the application instance
+- Custom command loaders
+- Global flags and event listeners
+- Application lifecycle management
+
+## Kernel Location
+
+The Ace kernel is typically created in your application's console entry point:
+
+```typescript
+// bin/console.ts
+import { Ignitor, Kernel } from '@adonisjs/core'
+
+const ignitor = new Ignitor(__dirname)
+
+ignitor
+  .ace()
+  .handle(process.argv.splice(2))
+```
+
+The kernel is automatically created and configured by the `createAceKernel` function from `@adonisjs/core/ace`.
+
+## Creating the Kernel
+
+The kernel is created using the `createAceKernel` helper function:
+
+```typescript
+import { createAceKernel } from '@adonisjs/core/ace'
+import { ApplicationService } from '@adonisjs/core/types'
+
+const app: ApplicationService = // ... application instance
+const kernel = createAceKernel(app)
+```
+
+Source code reference: `modules/ace/create_kernel.ts:34`
+
+### Kernel Configuration
+
+The `createAceKernel` function automatically:
+
+1. Creates a new Kernel instance with the application
+2. Sets the binary name (defaults to `node ace`)
+3. Registers command loaders
+4. Defines global flags
+5. Sets up event listeners
+
+## Command Registration
+
+The kernel supports multiple ways to register commands:
+
+### RC File Commands
+
+Commands listed in the `.adonisrc.ts` file are automatically loaded:
+
+```typescript
+// .adonisrc.ts
+export default {
+  commands: [
+    () => import('#commands/my_command'),
+    () => import('@adonisjs/lucid/commands'),
+  ]
+}
+```
+
+Source: `modules/ace/create_kernel.ts:42-46`
+
+### File System Loader
+
+Commands in the `commands/` directory are automatically discovered using the `FsLoader`:
+
+```typescript
+const fsLoader = new FsLoader<typeof BaseCommand>(app.commandsPath())
+kernel.addLoader({
+  async getMetaData() {
+    if (!commandName || !kernel.getCommand(commandName)) {
+      return fsLoader.getMetaData()
+    }
+    return []
+  },
+  getCommand(command) {
+    return fsLoader.getCommand(command)
+  },
+})
+```
+
+Source: `modules/ace/create_kernel.ts:53-64`
+
+The file system loader optimizes performance by only scanning for commands when necessary. If you're running a specific command that's already been registered via the RC file, it skips the file system scan.
+
+### Manual Registration
+
+You can manually register commands on the kernel:
+
+```typescript
+import MyCommand from './commands/my_command.js'
+
+kernel.addCommand(MyCommand)
+```
+
+## Global Flags
+
+The kernel defines global flags that work with all commands:
+
+### --ansi / --no-ansi
+
+Force enable or disable colorful output:
+
+```typescript
+kernel.defineFlag('ansi', {
+  type: 'boolean',
+  showNegatedVariantInHelp: true,
+  description: 'Force enable or disable colorful output',
+})
+```
+
+Source: `modules/ace/create_kernel.ts:69-73`
+
+The kernel listens for this flag and switches the UI mode:
+
+```typescript
+kernel.on('ansi', (_, $kernel, parsed) => {
+  if (parsed.flags.ansi === false) {
+    $kernel.ui.switchMode('silent')
+  }
+
+  if (parsed.flags.ansi === true) {
+    $kernel.ui.switchMode('normal')
+  }
+})
+```
+
+Source: `modules/ace/create_kernel.ts:83-91`
+
+### --help
+
+Display help information for any command:
+
+```typescript
+kernel.defineFlag('help', {
+  type: 'boolean',
+  description: HelpCommand.description,
+})
+```
+
+Source: `modules/ace/create_kernel.ts:75-78`
+
+When the help flag is used, the kernel displays the help command and short-circuits execution:
+
+```typescript
+kernel.on('help', async (command, $kernel, parsed) => {
+  parsed.args.unshift(command.commandName)
+  const help = new HelpCommand($kernel, parsed, kernel.ui, kernel.prompt)
+  await help.exec()
+  return $kernel.shortcircuit()
+})
+```
+
+Source: `modules/ace/create_kernel.ts:96-101`
+
+## Kernel Properties
+
+### app
+
+The AdonisJS application instance:
+
+```typescript
+export class Kernel extends AceKernel<typeof BaseCommand> {
+  constructor(public app: ApplicationService) {
+    // ...
+  }
+}
+```
+
+Source: `modules/ace/kernel.ts:33`
+
+Commands have access to this via `this.app` in BaseCommand.
+
+### ui
+
+UI primitives for rendering output:
+
+```typescript
+kernel.ui.logger.info('Message')
+kernel.ui.logger.success('Success!')
+kernel.ui.logger.error('Error!')
+```
+
+### prompt
+
+Prompt utilities for user interaction:
+
+```typescript
+const name = await kernel.prompt.ask('What is your name?')
+const confirmed = await kernel.prompt.confirm('Are you sure?')
+```
+
+### info
+
+Metadata about the CLI:
+
+```typescript
+kernel.info.set('binary', 'node ace')
+kernel.info.get('binary') // 'node ace'
+```
+
+Source: `modules/ace/create_kernel.ts:36`
+
+## Command Execution
+
+The kernel handles command execution through several steps:
+
+### 1. Command Instantiation
+
+When a command is executed, the kernel uses the application's container to instantiate it:
+
+```typescript
+export class Kernel extends AceKernel<typeof BaseCommand> {
+  constructor(public app: ApplicationService) {
+    super(ListCommand, {
+      create: async (command, parsedOutput, $kernel) => {
+        return app.container.make(command, [
+          app,
+          $kernel,
+          parsedOutput,
+          $kernel.ui,
+          $kernel.prompt
+        ])
+      },
+      run: (command) => command.exec(),
+    })
+  }
+}
+```
+
+Source: `modules/ace/kernel.ts:34-40`
+
+This enables full dependency injection support in commands.
+
+### 2. Command Execution
+
+The `exec()` method on the command runs through the lifecycle:
+
+```typescript
+async exec() {
+  this.hydrate()
+
+  try {
+    // Execute template methods
+    this.prepare && (await this.app.container.call<any, 'prepare'>(this, 'prepare'))
+    this.interact && (await this.app.container.call<any, 'interact'>(this, 'interact'))
+    const result = await this.app.container.call<BaseCommand, 'run'>(this, 'run')
+
+    // Set exit code
+    this.result = this.result === undefined ? result : this.result
+    this.exitCode = this.exitCode ?? 0
+  } catch (error) {
+    this.error = error
+    this.exitCode = this.exitCode ?? 1
+  }
+
+  // Run completed method
+  let errorHandled = this.completed
+    ? await this.app.container.call<any, 'completed'>(this, 'completed')
+    : false
+
+  if (this.error && !errorHandled) {
+    await this.kernel.errorHandler.render(this.error, this.kernel)
+  }
+
+  return this.result
+}
+```
+
+Source: `modules/ace/commands.ts:105-139`
+
+### 3. Error Handling
+
+Errors during command execution are handled by the kernel's error handler, unless the command's `completed()` hook returns `true` to suppress default error reporting.
+
+## Running Commands Programmatically
+
+You can execute commands programmatically using the kernel:
+
+### Execute a Command
+
+```typescript
+const result = await kernel.exec('make:controller', ['User'])
+console.log(result.exitCode) // 0 for success, 1 for failure
+```
+
+### Handle Command Output
+
+```typescript
+await kernel.handle(['make:controller', 'User'])
+```
+
+The `handle()` method parses and executes the command array.
+
+## Main Command Tracking
+
+The kernel tracks the "main" command (the one directly invoked by the user) vs. sub-commands (commands executed by other commands):
+
+```typescript
+const mainCommand = kernel.getMainCommand()
+```
+
+Commands use this to determine if they should terminate the application:
+
+```typescript
+async terminate() {
+  if (this.kernel.getMainCommand() === this) {
+    await this.app.terminate()
+  }
+}
+```
+
+Source: `modules/ace/commands.ts:156-160`
+
+This prevents sub-commands from terminating the application prematurely.
+
+## Custom Kernel
+
+You can extend the Kernel class to add custom functionality:
+
+```typescript
+import { Kernel as BaseKernel } from '@adonisjs/core/ace'
+import type { ApplicationService } from '@adonisjs/core/types'
+
+export class CustomKernel extends BaseKernel {
+  constructor(app: ApplicationService) {
+    super(app)
+    this.setupCustomFlags()
+  }
+
+  private setupCustomFlags() {
+    this.defineFlag('verbose', {
+      type: 'boolean',
+      description: 'Enable verbose output',
+    })
+
+    this.on('verbose', (_, $kernel) => {
+      // Handle verbose flag
+    })
+  }
+}
+```
+
+## Kernel Events
+
+The kernel emits events that you can listen to:
+
+### Flag Events
+
+Emitted when a global flag is used:
+
+```typescript
+kernel.on('ansi', (command, kernel, parsed) => {
+  // Handle ansi flag
+})
+
+kernel.on('help', async (command, kernel, parsed) => {
+  // Handle help flag
+})
+```
+
+### Shortcircuit
+
+Stop command execution and return immediately:
+
+```typescript
+kernel.on('help', async (command, $kernel, parsed) => {
+  // Show help
+  return $kernel.shortcircuit()
+})
+```
+
+Source: `modules/ace/create_kernel.ts:100`
+
+## Tracing Channels
+
+Ace supports tracing channels for monitoring command execution:
+
+```typescript
+import { tracingChannels } from '@adonisjs/core/ace'
+
+tracingChannels.command.start.subscribe((message) => {
+  console.log('Command started:', message.command)
+})
+
+tracingChannels.command.end.subscribe((message) => {
+  console.log('Command ended:', message.command, message.exitCode)
+})
+```
+
+This is useful for logging, monitoring, and debugging command execution.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use the default kernel configuration">
+    Unless you have specific needs, use the `createAceKernel` helper function instead of manually creating the kernel. It handles all the standard configuration.
+    
+    ```typescript
+    // Good
+    import { createAceKernel } from '@adonisjs/core/ace'
+    const kernel = createAceKernel(app)
+    
+    // Avoid (unless you need custom configuration)
+    const kernel = new Kernel(app)
+    // ... manual setup
+    ```
+  </Accordion>
+  
+  <Accordion title="Register commands in .adonisrc.ts">
+    For better performance, register frequently-used commands in `.adonisrc.ts` instead of relying solely on file system scanning.
+    
+    ```typescript
+    export default {
+      commands: [
+        () => import('#commands/send_emails'),
+        () => import('@adonisjs/lucid/commands'),
+      ]
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use kernel.exec() for sub-commands">
+    When executing commands from within other commands, use `kernel.exec()` instead of manually instantiating command classes:
+    
+    ```typescript
+    // Good
+    await this.kernel.exec('migrate', [])
+    
+    // Avoid
+    const migrate = new MigrateCommand()
+    await migrate.run()
+    ```
+  </Accordion>
+  
+  <Accordion title="Leverage dependency injection">
+    The kernel's integration with the IoC container means you can inject dependencies into command lifecycle methods:
+    
+    ```typescript
+    async run(userService: UserService) {
+      await userService.doSomething()
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

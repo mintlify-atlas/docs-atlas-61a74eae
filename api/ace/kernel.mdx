@@ -1,0 +1,189 @@
+---
+title: Kernel
+description: API reference for the Ace Kernel class used to manage and execute CLI commands in AdonisJS applications
+---
+
+# Kernel
+
+The Ace command kernel for AdonisJS applications. This kernel extends the base Ace kernel with AdonisJS-specific functionality like dependency injection and application lifecycle management.
+
+## Import
+
+```typescript
+import { Kernel } from '@adonisjs/core/ace'
+```
+
+## Constructor
+
+Creates a new Ace kernel instance.
+
+<ParamField path="app" type="ApplicationService" required>
+  The AdonisJS application instance
+</ParamField>
+
+### Example
+
+```typescript
+const app = new Application(new URL('../', import.meta.url))
+const kernel = new Kernel(app)
+
+await kernel.handle(['make:controller', 'UserController'])
+```
+
+## Properties
+
+<ParamField path="app" type="ApplicationService">
+  Reference to the AdonisJS application instance
+</ParamField>
+
+## Inherited Methods
+
+The `Kernel` class extends `@adonisjs/ace` Kernel and inherits all its methods:
+
+### handle()
+
+Handle and execute a command with the provided arguments.
+
+<ParamField path="argv" type="string[]" required>
+  Array of command line arguments (e.g., `['make:controller', 'UserController']`)
+</ParamField>
+
+**Returns:** `Promise<any>`
+
+```typescript
+await kernel.handle(['make:controller', 'UserController'])
+```
+
+### addLoader()
+
+Register a command loader to lazy-load commands.
+
+<ParamField path="loader" type="CommandLoader | (() => Promise<CommandModule>)" required>
+  A loader function or object that provides command metadata and loading logic
+</ParamField>
+
+**Returns:** `void`
+
+```typescript
+kernel.addLoader(() => import('./commands/make_user.js'))
+```
+
+### getCommand()
+
+Get a command instance by name.
+
+<ParamField path="commandName" type="string" required>
+  The name of the command to retrieve
+</ParamField>
+
+**Returns:** `Command | undefined`
+
+```typescript
+const command = kernel.getCommand('make:controller')
+```
+
+### getMainCommand()
+
+Get the main command that is currently executing.
+
+**Returns:** `Command | undefined`
+
+```typescript
+const mainCommand = kernel.getMainCommand()
+```
+
+### defineFlag()
+
+Define a global flag that is available across all commands.
+
+<ParamField path="name" type="string" required>
+  The name of the flag
+</ParamField>
+
+<ParamField path="options" type="FlagOptions" required>
+  Configuration options for the flag including type, description, and default value
+</ParamField>
+
+**Returns:** `void`
+
+```typescript
+kernel.defineFlag('verbose', {
+  type: 'boolean',
+  description: 'Enable verbose output',
+  default: false
+})
+```
+
+### on()
+
+Register an event listener for flag events.
+
+<ParamField path="flag" type="string" required>
+  The flag name to listen for
+</ParamField>
+
+<ParamField path="handler" type="(command: Command, kernel: Kernel, parsed: ParsedOutput) => any" required>
+  Event handler function
+</ParamField>
+
+**Returns:** `void`
+
+```typescript
+kernel.on('verbose', (command, kernel, parsed) => {
+  if (parsed.flags.verbose) {
+    kernel.ui.switchMode('verbose')
+  }
+})
+```
+
+### shortcircuit()
+
+Stop command execution and prevent further processing.
+
+**Returns:** `symbol`
+
+```typescript
+return kernel.shortcircuit()
+```
+
+## Factory Function
+
+### createAceKernel()
+
+Create and configure an Ace command kernel for AdonisJS applications with default loaders and flags.
+
+```typescript
+import { createAceKernel } from '@adonisjs/core/ace'
+```
+
+<ParamField path="app" type="ApplicationService" required>
+  The AdonisJS application service instance
+</ParamField>
+
+<ParamField path="commandName" type="string">
+  Optional specific command name for optimized loading
+</ParamField>
+
+**Returns:** `Kernel`
+
+#### Example
+
+```typescript
+const app = new Application(new URL('../', import.meta.url))
+const kernel = createAceKernel(app)
+
+// Run a specific command
+await kernel.handle(['make:controller', 'UserController'])
+```
+
+#### Features
+
+- Automatically loads commands from `rcFile.commands`
+- Sets up filesystem loader for application commands
+- Defines global `--ansi` and `--help` flags
+- Configures flag listeners for colorful output and help display
+
+## See Also
+
+- [Command API](/api/ace/command) - Create custom Ace commands
+- [Codemods API](/api/ace/codemods) - Programmatically modify source files

@@ -1,0 +1,937 @@
+---
+title: Helpers API
+description: Core utility functions and helpers for string manipulation, cryptography, file operations, assertions, and type checking in AdonisJS applications
+---
+
+The Helpers module provides a comprehensive collection of utility functions for common tasks in AdonisJS applications. It includes utilities for string manipulation, cryptographic operations, file system operations, assertions, and type checking.
+
+## Import
+
+```typescript
+import { 
+  fsReadAll, 
+  fsImportAll, 
+  base64, 
+  compose, 
+  Secret,
+  safeEqual,
+  MessageBuilder,
+  VerificationToken,
+  string,
+  assertExists,
+  is
+} from '@adonisjs/core/helpers'
+```
+
+## File System Utilities
+
+### fsReadAll
+
+Recursively read all files from a directory.
+
+<ParamField path="directory" type="URL | string" required>
+  The directory path to read files from
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional configuration for reading files
+  
+  <ParamField path="options.filter" type="(path: string) => boolean">
+    Filter function to include/exclude files
+  </ParamField>
+  
+  <ParamField path="options.sort" type="boolean">
+    Whether to sort the results alphabetically
+  </ParamField>
+</ParamField>
+
+**Returns:** `Promise<string[]>` - Array of file paths
+
+```typescript
+import { fsReadAll } from '@adonisjs/core/helpers'
+
+const files = await fsReadAll(new URL('./app/controllers', import.meta.url))
+console.log(files) // ['UsersController.ts', 'PostsController.ts']
+```
+
+### fsImportAll
+
+Recursively import all modules from a directory.
+
+<ParamField path="directory" type="URL | string" required>
+  The directory path to import modules from
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional configuration for importing modules
+  
+  <ParamField path="options.filter" type="(path: string) => boolean">
+    Filter function to include/exclude files
+  </ParamField>
+</ParamField>
+
+**Returns:** `Promise<Record<string, any>[]>` - Array of imported modules
+
+```typescript
+import { fsImportAll } from '@adonisjs/core/helpers'
+
+const events = await fsImportAll(new URL('./app/events', import.meta.url))
+events.forEach(event => {
+  console.log(event.default)
+})
+```
+
+## Cryptographic Utilities
+
+### base64
+
+Base64 encoding and decoding utilities.
+
+#### base64.encode
+
+Encode a string or buffer to base64.
+
+<ParamField path="input" type="string | Buffer" required>
+  The data to encode
+</ParamField>
+
+<ParamField path="urlSafe" type="boolean" default="false">
+  Whether to use URL-safe encoding
+</ParamField>
+
+**Returns:** `string` - Base64 encoded string
+
+```typescript
+import { base64 } from '@adonisjs/core/helpers'
+
+const encoded = base64.encode('sensitive data')
+const urlSafe = base64.encode('data', true)
+```
+
+#### base64.decode
+
+Decode a base64 string.
+
+<ParamField path="input" type="string" required>
+  The base64 string to decode
+</ParamField>
+
+<ParamField path="encoding" type="string" default="utf8">
+  The character encoding to use
+</ParamField>
+
+**Returns:** `string` - Decoded string
+
+```typescript
+const decoded = base64.decode(encoded)
+```
+
+#### base64.urlEncode
+
+Encode data using URL-safe base64 encoding.
+
+<ParamField path="input" type="string | Buffer" required>
+  The data to encode
+</ParamField>
+
+**Returns:** `string` - URL-safe base64 encoded string
+
+```typescript
+const urlEncoded = base64.urlEncode('data with special chars')
+```
+
+#### base64.urlDecode
+
+Decode a URL-safe base64 string.
+
+<ParamField path="input" type="string" required>
+  The URL-safe base64 string to decode
+</ParamField>
+
+<ParamField path="encoding" type="string" default="utf8">
+  The character encoding to use
+</ParamField>
+
+**Returns:** `string` - Decoded string
+
+```typescript
+const decoded = base64.urlDecode(urlEncoded)
+```
+
+### safeEqual
+
+Perform a constant-time comparison of two strings or buffers to prevent timing attacks.
+
+<ParamField path="a" type="string | Buffer" required>
+  First value to compare
+</ParamField>
+
+<ParamField path="b" type="string | Buffer" required>
+  Second value to compare
+</ParamField>
+
+**Returns:** `boolean` - True if values are equal
+
+```typescript
+import { safeEqual } from '@adonisjs/core/helpers'
+
+const isEqual = safeEqual(hash1, hash2)
+if (isEqual) {
+  console.log('Hashes match')
+}
+```
+
+### Secret
+
+Wrapper class for managing sensitive data that should not be logged or serialized.
+
+<ParamField path="value" type="string" required>
+  The secret value to wrap
+</ParamField>
+
+```typescript
+import { Secret } from '@adonisjs/core/helpers'
+
+const apiKey = new Secret('my-api-key-12345')
+
+// Safe to log - won't expose the secret
+console.log(apiKey) // Secret {}
+
+// Get the actual value when needed
+const actualValue = apiKey.release()
+```
+
+#### Methods
+
+<ParamField path="release" type="() => string">
+  Returns the underlying secret value
+</ParamField>
+
+### compose
+
+Compose multiple classes or mixins into a single class.
+
+<ParamField path="base" type="Constructor" required>
+  The base class to extend
+</ParamField>
+
+<ParamField path="mixins" type="Constructor[]" required>
+  Array of mixin classes to compose
+</ParamField>
+
+**Returns:** `Constructor` - Composed class
+
+```typescript
+import { compose } from '@adonisjs/core/helpers'
+
+class Base {
+  name = 'base'
+}
+
+const Mixin1 = (superclass) => class extends superclass {
+  method1() { return 'mixin1' }
+}
+
+const Mixin2 = (superclass) => class extends superclass {
+  method2() { return 'mixin2' }
+}
+
+const Composed = compose(Base, Mixin1, Mixin2)
+const instance = new Composed()
+```
+
+### MessageBuilder
+
+Builder class for constructing formatted messages.
+
+```typescript
+import { MessageBuilder } from '@adonisjs/core/helpers'
+
+const message = new MessageBuilder()
+  .add('Error: %s', 'Something went wrong')
+  .add('Code: %d', 500)
+  .toString()
+```
+
+### VerificationToken
+
+Abstract class for creating secure verification tokens with hash storage.
+
+```typescript
+import { VerificationToken } from '@adonisjs/core/helpers'
+
+class UserToken extends VerificationToken {
+  declare identifier: string
+  declare tokenableId: string
+  declare hash: string
+  declare expiresAt: Date
+  
+  constructor(user: User, secret: Secret<string>) {
+    super()
+    this.tokenableId = user.id
+    this.computeValue(secret)
+  }
+}
+```
+
+#### Static Methods
+
+##### VerificationToken.decode
+
+Decode a publicly shared token.
+
+<ParamField path="value" type="string" required>
+  The token string to decode
+</ParamField>
+
+**Returns:** `{ identifier: string; secret: Secret<string> } | null`
+
+```typescript
+const decoded = VerificationToken.decode(tokenString)
+if (decoded) {
+  console.log(decoded.identifier)
+  console.log(decoded.secret.release())
+}
+```
+
+##### VerificationToken.createTransientToken
+
+Create a transient token for database storage.
+
+<ParamField path="userId" type="string | number | BigInt" required>
+  The user ID for whom the token is created
+</ParamField>
+
+<ParamField path="size" type="number" required>
+  The size of the random token seed
+</ParamField>
+
+<ParamField path="expiresIn" type="string | number" required>
+  Token expiration time (e.g., '2h', '30m', or seconds as number)
+</ParamField>
+
+**Returns:** `{ userId: string | number | BigInt; expiresAt: Date; secret: Secret<string>; hash: string }`
+
+```typescript
+const token = VerificationToken.createTransientToken(user.id, 40, '2 hours')
+// Store token.hash and token.expiresAt in database
+// Return token.secret to user
+```
+
+##### VerificationToken.seed
+
+Generate a random seed and its hash.
+
+<ParamField path="size" type="number" required>
+  The length of the random token to generate
+</ParamField>
+
+**Returns:** `{ secret: Secret<string>; hash: string }`
+
+```typescript
+const { secret, hash } = VerificationToken.seed(40)
+```
+
+#### Instance Methods
+
+##### isExpired
+
+Check if the token has expired.
+
+**Returns:** `boolean` - True if token is expired
+
+```typescript
+if (token.isExpired()) {
+  console.log('Token has expired')
+}
+```
+
+##### verify
+
+Verify a secret against the stored hash.
+
+<ParamField path="secret" type="Secret<string>" required>
+  The secret to verify
+</ParamField>
+
+**Returns:** `boolean` - True if secret matches hash
+
+```typescript
+const isValid = token.verify(secret)
+if (isValid) {
+  console.log('Token is valid')
+}
+```
+
+## String Utilities
+
+Comprehensive string manipulation utilities.
+
+```typescript
+import string from '@adonisjs/core/helpers/string'
+```
+
+### string.camelCase
+
+Convert a string to camelCase.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.camelCase('hello_world') // 'helloWorld'
+string.camelCase('Hello World') // 'helloWorld'
+```
+
+### string.snakeCase
+
+Convert a string to snake_case.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.snakeCase('HelloWorld') // 'hello_world'
+string.snakeCase('helloWorld') // 'hello_world'
+```
+
+### string.pascalCase
+
+Convert a string to PascalCase.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.pascalCase('hello_world') // 'HelloWorld'
+string.pascalCase('hello world') // 'HelloWorld'
+```
+
+### string.capitalCase
+
+Convert a string to Capital Case.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.capitalCase('hello_world') // 'Hello World'
+```
+
+### string.sentenceCase / string.toSentence
+
+Convert a string to sentence case.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.toSentence('hello_world') // 'Hello world'
+string.toSentence('firstName') // 'First name'
+```
+
+### string.dashCase
+
+Convert a string to dash-case (kebab-case).
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.dashCase('HelloWorld') // 'hello-world'
+```
+
+### string.dotCase
+
+Convert a string to dot.case.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.dotCase('HelloWorld') // 'hello.world'
+```
+
+### string.noCase
+
+Convert a string to no case (space separated lowercase).
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.noCase('HelloWorld') // 'hello world'
+```
+
+### string.titleCase
+
+Convert a string to Title Case.
+
+<ParamField path="value" type="string" required>
+  The string to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.titleCase('hello_world') // 'Hello World'
+```
+
+### string.pluralize
+
+Convert a word to its plural form.
+
+<ParamField path="word" type="string" required>
+  The word to pluralize
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.pluralize('user') // 'users'
+string.pluralize('person') // 'people'
+```
+
+### string.singular
+
+Convert a word to its singular form.
+
+<ParamField path="word" type="string" required>
+  The word to singularize
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.singular('users') // 'user'
+string.singular('people') // 'person'
+```
+
+### string.ordinal / string.ordinalize
+
+Convert a number to its ordinal form.
+
+<ParamField path="value" type="number" required>
+  The number to convert
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.ordinalize(1) // '1st'
+string.ordinalize(22) // '22nd'
+string.ordinalize(103) // '103rd'
+```
+
+### string.random / string.generateRandom
+
+Generate a cryptographically secure random string.
+
+<ParamField path="length" type="number" required>
+  The length of the string to generate
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.generateRandom(16) // 'a1b2c3d4e5f6g7h8'
+string.generateRandom(32) // Long random string
+```
+
+### string.truncate
+
+Truncate a string to a specified length.
+
+<ParamField path="value" type="string" required>
+  The string to truncate
+</ParamField>
+
+<ParamField path="length" type="number" required>
+  Maximum length
+</ParamField>
+
+<ParamField path="options" type="object">
+  <ParamField path="options.completeWords" type="boolean">
+    Whether to complete words instead of cutting them off
+  </ParamField>
+  
+  <ParamField path="options.suffix" type="string" default="...">
+    Suffix to append when truncated
+  </ParamField>
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.truncate('Hello world', 8) // 'Hello...'
+string.truncate('Hello world', 8, { completeWords: true }) // 'Hello...'
+```
+
+### string.excerpt
+
+Create an excerpt from a longer text.
+
+<ParamField path="value" type="string" required>
+  The text to excerpt
+</ParamField>
+
+<ParamField path="length" type="number" required>
+  Maximum length of excerpt
+</ParamField>
+
+<ParamField path="options" type="object">
+  Options for excerpt generation
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+const text = 'Lorem ipsum dolor sit amet'
+string.excerpt(text, 15) // 'Lorem ipsum...'
+```
+
+### string.slug
+
+Generate a URL-friendly slug.
+
+<ParamField path="value" type="string" required>
+  The string to convert to slug
+</ParamField>
+
+<ParamField path="options" type="object">
+  <ParamField path="options.replacement" type="string" default="-">
+    Character to use as replacement
+  </ParamField>
+  
+  <ParamField path="options.lower" type="boolean" default="true">
+    Convert to lowercase
+  </ParamField>
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.slug('Hello World!') // 'hello-world'
+string.slug('Hello World!', { replacement: '_' }) // 'hello_world'
+```
+
+### string.isEmpty
+
+Check if a string is empty or contains only whitespace.
+
+<ParamField path="value" type="string" required>
+  The string to check
+</ParamField>
+
+**Returns:** `boolean`
+
+```typescript
+string.isEmpty('') // true
+string.isEmpty('   ') // true
+string.isEmpty('hello') // false
+```
+
+### string.escapeHTML
+
+Escape HTML entities to prevent XSS attacks.
+
+<ParamField path="value" type="string" required>
+  The string to escape
+</ParamField>
+
+<ParamField path="options" type="object">
+  <ParamField path="options.encodeSymbols" type="boolean">
+    Whether to encode Unicode symbols as HTML entities
+  </ParamField>
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.escapeHTML('<script>alert("xss")</script>')
+// '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
+
+string.escapeHTML('© 2023', { encodeSymbols: true })
+// '&copy; 2023'
+```
+
+### string.encodeSymbols
+
+Encode Unicode symbols as HTML entities.
+
+<ParamField path="value" type="string" required>
+  The string containing symbols to encode
+</ParamField>
+
+<ParamField path="options" type="object">
+  Encoding options from the 'he' library
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+string.encodeSymbols('© 2023 AdonisJS ™')
+// '&copy; 2023 AdonisJS &trade;'
+```
+
+### string.prettyHrTime
+
+Convert high-resolution time to human-readable format.
+
+<ParamField path="time" type="[number, number]" required>
+  High-resolution time tuple from process.hrtime()
+</ParamField>
+
+<ParamField path="options" type="object">
+  <ParamField path="options.verbose" type="boolean">
+    Use verbose format (e.g., '1 second' vs '1s')
+  </ParamField>
+  
+  <ParamField path="options.precise" type="boolean">
+    Show precise decimal places
+  </ParamField>
+</ParamField>
+
+**Returns:** `string`
+
+```typescript
+const start = process.hrtime()
+// ... some operation
+const diff = process.hrtime(start)
+
+string.prettyHrTime(diff) // '2.5ms'
+string.prettyHrTime(diff, { verbose: true }) // '2 milliseconds'
+```
+
+### string.create
+
+Create a StringBuilder instance for efficient string concatenation.
+
+<ParamField path="value" type="string | StringBuilder" required>
+  Initial string value or existing StringBuilder
+</ParamField>
+
+**Returns:** `StringBuilder`
+
+```typescript
+const builder = string.create('Hello')
+builder.append(' ').append('World')
+console.log(builder.toString()) // 'Hello World'
+```
+
+## Assertion Utilities
+
+Type-safe assertion functions for runtime checks.
+
+```typescript
+import { 
+  assertExists, 
+  assertNotNull, 
+  assertIsDefined, 
+  assertUnreachable 
+} from '@adonisjs/core/helpers'
+```
+
+### assertExists
+
+Assert that a value exists (is not null or undefined).
+
+<ParamField path="value" type="T | null | undefined" required>
+  The value to check
+</ParamField>
+
+<ParamField path="message" type="string">
+  Optional error message
+</ParamField>
+
+**Throws:** `Error` if value is null or undefined
+
+```typescript
+function processUser(user: User | null) {
+  assertExists(user) // TypeScript knows user is not null after this
+  console.log(user.name) // Safe to access properties
+}
+```
+
+### assertNotNull
+
+Assert that a value is not null.
+
+<ParamField path="value" type="T | null" required>
+  The value to check
+</ParamField>
+
+<ParamField path="message" type="string">
+  Optional error message
+</ParamField>
+
+**Throws:** `Error` if value is null
+
+```typescript
+assertNotNull(userInput)
+// TypeScript knows userInput is not null here
+```
+
+### assertIsDefined
+
+Assert that a value is defined (is not undefined).
+
+<ParamField path="value" type="T | undefined" required>
+  The value to check
+</ParamField>
+
+<ParamField path="message" type="string">
+  Optional error message
+</ParamField>
+
+**Throws:** `Error` if value is undefined
+
+```typescript
+assertIsDefined(config.apiKey)
+// TypeScript knows config.apiKey is defined here
+```
+
+### assertUnreachable
+
+Assert that code should never reach this point. Useful for exhaustiveness checking.
+
+<ParamField path="value" type="never" required>
+  The value that should be of type never
+</ParamField>
+
+**Throws:** `Error` always
+
+```typescript
+function handleStatus(status: 'pending' | 'completed') {
+  switch (status) {
+    case 'pending':
+      return 'Processing...'
+    case 'completed':
+      return 'Done!'
+    default:
+      return assertUnreachable(status)
+  }
+}
+```
+
+## Type Checking Utilities
+
+Comprehensive type checking with TypeScript type guards.
+
+```typescript
+import { is } from '@adonisjs/core/helpers'
+```
+
+The `is` object provides numerous type-checking utilities re-exported from `@sindresorhus/is`. Here are some commonly used methods:
+
+### Basic Types
+
+```typescript
+is.string(value)       // Check if value is a string
+is.number(value)       // Check if value is a number
+is.boolean(value)      // Check if value is a boolean
+is.array(value)        // Check if value is an array
+is.object(value)       // Check if value is an object
+is.function(value)     // Check if value is a function
+is.null(value)         // Check if value is null
+is.undefined(value)    // Check if value is undefined
+```
+
+### Advanced Types
+
+```typescript
+is.plainObject(obj)         // Check if object is plain (not class instance)
+is.emptyObject(obj)         // Check if object is empty
+is.nonEmptyObject(obj)      // Check if object has properties
+is.emptyArray(arr)          // Check if array is empty
+is.nonEmptyArray(arr)       // Check if array has elements
+is.integer(num)             // Check if number is integer
+is.positiveNumber(num)      // Check if number is positive
+is.negativeNumber(num)      // Check if number is negative
+is.promise(value)           // Check if value is a Promise
+is.asyncFunction(fn)        // Check if function is async
+is.date(value)              // Check if value is a Date
+is.validDate(date)          // Check if Date is valid
+```
+
+### Usage Examples
+
+```typescript
+if (is.string(value)) {
+  // TypeScript knows value is string
+  console.log(value.toUpperCase())
+}
+
+if (is.array(value) && is.nonEmptyArray(value)) {
+  console.log('Array has items:', value.length)
+}
+
+if (is.plainObject(obj) && is.hasProperty(obj, 'name')) {
+  console.log('Object has name property')
+}
+
+if (is.number(num) && is.integer(num) && is.positive(num)) {
+  console.log('Positive integer:', num)
+}
+```
+
+## HTTP Helpers
+
+HTTP-related utilities are re-exported from `@adonisjs/http-server/helpers`.
+
+```typescript
+import { middlewareInfo, routeInfo } from '@adonisjs/core/helpers/http'
+```
+
+For detailed documentation on HTTP helpers, refer to the [HTTP Server documentation](https://docs.adonisjs.com/guides/http/introduction).
+
+## Utility Functions
+
+### defineStaticProperty
+
+Define a static property on a class that is not enumerable.
+
+<ParamField path="target" type="object" required>
+  The target object (usually a class)
+</ParamField>
+
+<ParamField path="propertyName" type="string" required>
+  The name of the property to define
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  The value of the property
+</ParamField>
+
+```typescript
+import { defineStaticProperty } from '@adonisjs/core/helpers'
+
+class MyClass {}
+
+defineStaticProperty(MyClass, 'version', '1.0.0')
+console.log(MyClass.version) // '1.0.0'
+```

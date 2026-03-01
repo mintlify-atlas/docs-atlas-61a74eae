@@ -1,0 +1,199 @@
+---
+title: 'Server'
+description: 'HTTP Server API reference for managing the AdonisJS HTTP server lifecycle'
+---
+
+The `Server` class is responsible for managing the HTTP server lifecycle in AdonisJS. It handles starting and stopping the server, managing middleware, and processing incoming requests.
+
+## Importing
+
+```typescript
+import server from '#services/server'
+import { Server } from '@adonisjs/core/http'
+```
+
+## Properties
+
+<ParamField path="router" type="Router">
+  Reference to the application's router instance
+</ParamField>
+
+<ParamField path="hooks" type="Hooks">
+  Hooks manager for registering lifecycle hooks
+</ParamField>
+
+<ParamField path="middleware" type="MiddlewareStore">
+  Middleware store for managing global and route middleware
+</ParamField>
+
+## Methods
+
+### use()
+
+Register global middleware to be executed for all requests.
+
+```typescript
+server.use([
+  () => import('#middleware/container_bindings_middleware'),
+  () => import('#middleware/force_json_response_middleware'),
+  () => import('@adonisjs/core/bodyparser_middleware')
+])
+```
+
+<ParamField path="middleware" type="MiddlewareFunction[]">
+  Array of middleware functions or lazy imports
+</ParamField>
+
+**Returns:** `this`
+
+### useRouted()
+
+Register routed middleware that can be selectively applied to routes.
+
+```typescript
+server.useRouted({
+  auth: () => import('#middleware/auth_middleware'),
+  guest: () => import('#middleware/guest_middleware')
+})
+```
+
+<ParamField path="middleware" type="Record<string, MiddlewareFunction>">
+  Object mapping middleware names to their implementations
+</ParamField>
+
+**Returns:** `this`
+
+### errorHandler()
+
+Register a custom error handler for the application.
+
+```typescript
+server.errorHandler(() => import('#exceptions/handler'))
+```
+
+<ParamField path="handler" type="() => Promise<ErrorHandler>">
+  Lazy import function that returns an error handler class
+</ParamField>
+
+**Returns:** `this`
+
+### start()
+
+Start the HTTP server and begin listening for requests.
+
+```typescript
+await server.start((handle) => {
+  const server = createServer(handle)
+  server.listen(3333)
+  return server
+})
+```
+
+<ParamField path="callback" type="(handle: HandleFunction) => NodeServer | Promise<NodeServer>">
+  Callback function that receives the request handler and returns a Node.js server instance
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+### close()
+
+Gracefully close the HTTP server.
+
+```typescript
+await server.close()
+```
+
+**Returns:** `Promise<void>`
+
+### optimize()
+
+Optimize the server by precompiling routes and middleware.
+
+```typescript
+await server.optimize()
+```
+
+**Returns:** `Promise<void>`
+
+### handle()
+
+Handle an incoming HTTP request. This method is typically called internally.
+
+```typescript
+const ctx = await server.handle(req, res)
+```
+
+<ParamField path="req" type="IncomingMessage">
+  Node.js incoming message object
+</ParamField>
+
+<ParamField path="res" type="ServerResponse">
+  Node.js server response object
+</ParamField>
+
+**Returns:** `Promise<HttpContext>`
+
+## Hooks
+
+The server exposes several lifecycle hooks for executing code at specific points:
+
+### before
+
+Executed before the middleware pipeline starts.
+
+```typescript
+server.hooks.before(async (ctx) => {
+  console.log(`Request to ${ctx.request.url()}`)
+})
+```
+
+### after
+
+Executed after the response has been sent.
+
+```typescript
+server.hooks.after(async (ctx) => {
+  console.log(`Response sent with status ${ctx.response.getStatus()}`)
+})
+```
+
+## Example Usage
+
+```typescript
+import server from '#services/server'
+
+// Register global middleware
+server.use([
+  () => import('#middleware/container_bindings_middleware'),
+  () => import('@adonisjs/core/bodyparser_middleware')
+])
+
+// Register named middleware
+server.useRouted({
+  auth: () => import('#middleware/auth_middleware')
+})
+
+// Set error handler
+server.errorHandler(() => import('#exceptions/handler'))
+
+// Register lifecycle hooks
+server.hooks.before(async (ctx) => {
+  ctx.request.startTime = Date.now()
+})
+
+server.hooks.after(async (ctx) => {
+  const duration = Date.now() - ctx.request.startTime
+  console.log(`Request completed in ${duration}ms`)
+})
+```
+
+## Type Safety
+
+The server is fully typed and integrates with TypeScript for type-safe middleware and error handlers:
+
+```typescript
+import type { HttpServerService } from '@adonisjs/core/types'
+
+// Access server through container
+const server: HttpServerService = await app.container.make('server')
+```

@@ -1,0 +1,392 @@
+---
+title: Ignitor
+description: The Ignitor class is the entry point for bootstrapping AdonisJS applications in different environments
+---
+
+The `Ignitor` class serves as the main entry point for creating and managing AdonisJS applications. It provides a fluent API for bootstrapping your application in different environments like web servers, CLI commands, tests, and REPL.
+
+## Basic Usage
+
+The Ignitor is typically used in your application's entry point files:
+
+```typescript title="bin/server.ts"
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+await ignitor.httpServer().start()
+```
+
+## Constructor
+
+The Ignitor constructor accepts two parameters:
+
+```typescript
+constructor(appRoot: URL, options?: IgnitorOptions)
+```
+
+<ParamField path="appRoot" type="URL" required>
+  The root URL of your application, typically `new URL('../', import.meta.url)` from your entry point file.
+</ParamField>
+
+<ParamField path="options" type="IgnitorOptions">
+  Optional configuration object:
+  
+  <Expandable title="properties">
+    <ParamField path="importer" type="(filePath: string) => Promise<any>">
+      Custom importer function for loading modules. Defaults to the standard `import()` function.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Creating Applications
+
+The Ignitor provides different process classes for various environments:
+
+### HTTP Server
+
+Create an HTTP server process for handling web requests:
+
+```typescript title="bin/server.ts"
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+await ignitor.httpServer().start()
+```
+
+The HTTP server process:
+- Creates an application instance in the `'web'` environment
+- Initializes and boots the application
+- Starts the Node.js HTTP server
+- Listens on the configured host and port (from `HOST` and `PORT` environment variables)
+
+<Note>
+  By default, the server listens on `0.0.0.0:3333`. You can override this using the `HOST` and `PORT` environment variables.
+</Note>
+
+### Custom HTTP Server
+
+You can provide a custom server factory for HTTPS or other configurations:
+
+```typescript title="bin/server.ts"
+import { Ignitor } from '@adonisjs/core'
+import { createServer } from 'node:https'
+import { readFileSync } from 'node:fs'
+
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+await ignitor.httpServer().start((handler) => {
+  return createServer({
+    key: readFileSync('./key.pem'),
+    cert: readFileSync('./cert.pem')
+  }, handler)
+})
+```
+
+### Ace CLI
+
+Create an Ace process for running CLI commands:
+
+```typescript title="bin/console.ts"
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+await ignitor.ace().handle(process.argv.slice(2))
+```
+
+The Ace process:
+- Creates an application instance in the `'console'` environment
+- Initializes the application
+- Conditionally boots the app (only for commands that need it)
+- Handles command execution
+- Terminates the app after command completion
+
+#### Configuring Ace
+
+You can configure the Ace kernel before handling commands:
+
+```typescript title="bin/console.ts"
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+await ignitor
+  .ace()
+  .configure((app) => {
+    // Configure ace kernel
+    // Register custom commands, etc.
+  })
+  .handle(process.argv.slice(2))
+```
+
+### Test Runner
+
+Create a test runner process for executing tests:
+
+```typescript title="bin/test.ts"
+import { Ignitor } from '@adonisjs/core'
+import { configure, processCLIArgs, run } from '@japa/runner'
+
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+await ignitor.testRunner().run(async () => {
+  configure({
+    files: ['tests/**/*.spec.ts']
+  })
+  
+  processCLIArgs(process.argv.splice(2))
+  await run()
+})
+```
+
+## Source Code Reference
+
+The Ignitor class is defined in `src/ignitor/main.ts:36`:
+
+```typescript title="src/ignitor/main.ts"
+export class Ignitor {
+  #options: IgnitorOptions
+  #appRoot: URL
+  #app?: ApplicationService
+  #tapCallbacks: Set<(app: ApplicationService) => void> = new Set()
+
+  constructor(appRoot: URL, options: IgnitorOptions = {}) {
+    this.#appRoot = appRoot
+    this.#options = options
+  }
+
+  /**
+   * Create an instance of AdonisJS application
+   */
+  createApp(environment: AppEnvironments) {
+    this.#app = new Application(this.#appRoot, {
+      environment,
+      importer: this.#options.importer
+    })
+    
+    setApp(this.#app)
+    this.#runTapCallbacks(this.#app)
+    return this.#app
+  }
+
+  /**
+   * Tap to access the application class instance
+   */
+  tap(callback: (app: ApplicationService) => void): this {
+    this.#tapCallbacks.add(callback)
+    return this
+  }
+
+  /**
+   * Get instance of the HTTPServerProcess
+   */
+  httpServer() {
+    return new HttpServerProcess(this)
+  }
+
+  /**
+   * Get an instance of the AceProcess class
+   */
+  ace() {
+    return new AceProcess(this)
+  }
+
+  /**
+   * Get an instance of the TestRunnerProcess class
+   */
+  testRunner() {
+    return new TestRunnerProcess(this)
+  }
+
+  /**
+   * Terminates the app
+   */
+  async terminate() {
+    await this.#app?.terminate()
+  }
+}
+```
+
+## Methods
+
+### createApp()
+
+Creates an application instance for a specific environment:
+
+```typescript
+createApp(environment: 'web' | 'console' | 'test' | 'repl'): ApplicationService
+```
+
+<ParamField path="environment" type="AppEnvironments" required>
+  The environment in which to create the app:
+  - `'web'` - For HTTP server processes
+  - `'console'` - For CLI commands
+  - `'test'` - For test runner
+  - `'repl'` - For interactive REPL
+</ParamField>
+
+<Warning>
+  You typically don't call `createApp()` directly. Instead, use one of the process methods (`httpServer()`, `ace()`, `testRunner()`) which handle app creation automatically.
+</Warning>
+
+### tap()
+
+Register a callback that executes when the application is created:
+
+```typescript
+tap(callback: (app: ApplicationService) => void): this
+```
+
+```typescript
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+ignitor.tap((app) => {
+  // Access the application instance
+  console.log('App created:', app.getState())
+})
+
+await ignitor.httpServer().start()
+```
+
+### getApp()
+
+Retrieve the created application instance:
+
+```typescript
+getApp(): ApplicationService | undefined
+```
+
+```typescript
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+const app = ignitor.createApp('web')
+
+console.log(ignitor.getApp() === app) // true
+```
+
+### terminate()
+
+Terminate the application gracefully:
+
+```typescript
+await terminate(): Promise<void>
+```
+
+```typescript
+const ignitor = new Ignitor(new URL('../', import.meta.url))
+
+// Later...
+await ignitor.terminate()
+```
+
+## Process Classes
+
+### HttpServerProcess
+
+Manages the HTTP server lifecycle. Located at `src/ignitor/http.ts:32`.
+
+<Accordion title="View HttpServerProcess implementation">
+```typescript
+export class HttpServerProcess {
+  constructor(ignitor: Ignitor) {}
+
+  async start(
+    serverCallback?: (handler) => NodeHttpsServer | NodeHttpServer
+  ) {
+    const app = this.#ignitor.createApp('web')
+    
+    await app.init()
+    await app.boot()
+    await app.start(async () => {
+      const server = await app.container.make('server')
+      await server.boot()
+      
+      const httpServer = createHTTPServer(server.handle.bind(server))
+      server.setNodeServer(httpServer)
+      
+      await this.#listen(httpServer)
+      this.#monitorAppAndServer(httpServer, app, logger)
+    })
+  }
+}
+```
+</Accordion>
+
+### AceProcess
+
+Manages the Ace CLI lifecycle. Located at `src/ignitor/ace.ts:28`.
+
+<Accordion title="View AceProcess implementation">
+```typescript
+export class AceProcess {
+  constructor(ignitor: Ignitor) {}
+
+  configure(callback: (app: ApplicationService) => void): this {
+    this.#configureCallback = callback
+    return this
+  }
+
+  async handle(argv: string[]) {
+    const app = this.#ignitor.createApp('console')
+    await app.init()
+    
+    const kernel = createAceKernel(app, commandName)
+    app.container.bindValue('ace', kernel)
+    
+    // Boot app only for commands that need it
+    kernel.loading(async (metaData) => {
+      if (metaData.options.startApp && !app.isReady) {
+        await app.boot()
+        await app.start(() => {})
+      }
+    })
+    
+    await this.#configureCallback(app)
+    await kernel.handle(argv)
+    
+    // Terminate unless it's a long-running command
+    if (!mainCommand?.staysAlive) {
+      await app.terminate()
+    }
+  }
+}
+```
+</Accordion>
+
+## Application Lifecycle Hooks
+
+The Ignitor manages the application through distinct lifecycle phases:
+
+<Steps>
+  <Step title="Creation">
+    Application instance is created with the specified environment
+  </Step>
+  
+  <Step title="Initialization">
+    Application loads configuration and registers service providers
+  </Step>
+  
+  <Step title="Boot">
+    Service providers' boot methods are called
+  </Step>
+  
+  <Step title="Start">
+    Application starts and service providers' ready methods are called
+  </Step>
+  
+  <Step title="Termination">
+    Application and all services are gracefully shut down
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Application Lifecycle" icon="refresh" href="./application-lifecycle">
+    Learn about application states and lifecycle hooks
+  </Card>
+  <Card title="Service Providers" icon="plug" href="./service-providers">
+    Understand how to register services with the container
+  </Card>
+</CardGroup>

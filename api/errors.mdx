@@ -1,0 +1,354 @@
+---
+title: Errors
+description: API reference for error handling utilities and exception classes in AdonisJS Core
+---
+
+The errors module provides comprehensive error handling utilities for AdonisJS applications. It aggregates errors from multiple AdonisJS packages and provides utilities for creating and displaying custom exceptions.
+
+## Import
+
+```typescript
+import { errors, prettyPrintError } from '@adonisjs/core'
+import { Exception, createError } from '@adonisjs/core/exceptions'
+```
+
+## Aggregated Errors
+
+The `errors` export is an aggregated object containing all error classes from the following packages:
+
+- `@adonisjs/ace` - CLI-related errors
+- `@adonisjs/env` - Environment variable errors
+- `@adonisjs/application` - Application lifecycle errors
+- `@boringnode/encryption` - Encryption/decryption errors
+- `@adonisjs/http-server` - HTTP server errors
+
+```typescript
+import { errors } from '@adonisjs/core'
+
+// All error classes are available on the errors object
+throw new errors.E_INVALID_CREDENTIALS('Invalid username or password')
+```
+
+## Exception Classes
+
+### Exception
+
+Base exception class for creating custom exceptions with status codes, error codes, and additional context.
+
+```typescript
+import { Exception } from '@adonisjs/core/exceptions'
+
+class ValidationException extends Exception {
+  static status = 422
+  static code = 'E_VALIDATION_FAILURE'
+}
+
+throw new ValidationException('Validation failed')
+```
+
+#### Constructor
+
+<ParamField path="message" type="string" required>
+  The error message.
+</ParamField>
+
+<ParamField path="options" type="object">
+  Additional options for the exception.
+  
+  <Expandable title="properties">
+    <ParamField path="code" type="string">
+      Error code identifier.
+    </ParamField>
+    <ParamField path="status" type="number">
+      HTTP status code.
+    </ParamField>
+    <ParamField path="cause" type="Error">
+      The underlying cause of the error.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+#### Properties
+
+<ResponseField name="message" type="string">
+  The error message.
+</ResponseField>
+
+<ResponseField name="code" type="string">
+  The error code.
+</ResponseField>
+
+<ResponseField name="status" type="number">
+  The HTTP status code associated with the error.
+</ResponseField>
+
+<ResponseField name="cause" type="Error | undefined">
+  The underlying error that caused this exception.
+</ResponseField>
+
+### RuntimeException
+
+Exception class for errors that occur during application runtime.
+
+```typescript
+import { RuntimeException } from '@adonisjs/core/exceptions'
+
+throw new RuntimeException('Something went wrong at runtime')
+```
+
+### InvalidArgumentsException
+
+Exception class for invalid argument errors, typically used in function parameter validation.
+
+```typescript
+import { InvalidArgumentsException } from '@adonisjs/core/exceptions'
+
+function processUser(userId: string) {
+  if (!userId) {
+    throw new InvalidArgumentsException('User ID is required')
+  }
+}
+```
+
+## Creating Custom Errors
+
+### createError
+
+Utility function to create custom error classes with predefined message, code, and status.
+
+```typescript
+import { createError } from '@adonisjs/core/exceptions'
+
+const UserNotFound = createError(
+  'User not found',
+  'E_USER_NOT_FOUND',
+  404
+)
+
+throw new UserNotFound()
+```
+
+<ParamField path="message" type="string" required>
+  The default error message.
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  The error code identifier.
+</ParamField>
+
+<ParamField path="status" type="number" required>
+  The HTTP status code.
+</ParamField>
+
+<ResponseField name="return" type="ErrorConstructor">
+  Returns a new error class constructor.
+</ResponseField>
+
+## Error Display
+
+### prettyPrintError
+
+Pretty prints an error with colorful output using Youch terminal. Useful for displaying errors in CLI applications.
+
+```typescript
+import { prettyPrintError } from '@adonisjs/core'
+
+try {
+  // Your code
+} catch (error) {
+  await prettyPrintError(error)
+}
+```
+
+<ParamField path="error" type="any" required>
+  The error to print. Can be any error object.
+</ParamField>
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when the error has been printed.
+</ResponseField>
+
+The function automatically formats the error output with:
+- Stack traces with syntax highlighting
+- File paths and line numbers
+- Code snippets from the error location
+- Colorized output for better readability
+
+## Common Error Patterns
+
+### HTTP Errors
+
+```typescript
+import { errors } from '@adonisjs/core'
+
+// 401 Unauthorized
+throw new errors.E_UNAUTHORIZED_ACCESS('You must be logged in')
+
+// 403 Forbidden
+throw new errors.E_AUTHORIZATION_FAILURE('You do not have permission')
+
+// 404 Not Found
+throw new errors.E_ROUTE_NOT_FOUND('Route not found')
+
+// 422 Validation Error
+throw new errors.E_VALIDATION_FAILURE('Validation failed')
+```
+
+### Application Errors
+
+```typescript
+import { errors } from '@adonisjs/core'
+
+// Invalid configuration
+throw new errors.E_INVALID_CONFIG('Invalid configuration provided')
+
+// Missing environment variable
+throw new errors.E_MISSING_ENV_VALUE('DATABASE_URL is required')
+```
+
+### Encryption Errors
+
+```typescript
+import { errors } from '@adonisjs/core'
+
+try {
+  const decrypted = encryption.decrypt(value)
+} catch (error) {
+  if (error instanceof errors.E_DECRYPTION_FAILED) {
+    // Handle decryption failure
+  }
+}
+```
+
+## Usage Examples
+
+### Creating a Custom Exception Class
+
+```typescript
+import { Exception } from '@adonisjs/core/exceptions'
+
+export class PaymentException extends Exception {
+  static status = 402
+  static code = 'E_PAYMENT_REQUIRED'
+
+  constructor(message: string, amount: number) {
+    super(message)
+    this.amount = amount
+  }
+
+  amount: number
+}
+
+// Usage
+throw new PaymentException('Payment required', 99.99)
+```
+
+### Using createError for Quick Errors
+
+```typescript
+import { createError } from '@adonisjs/core/exceptions'
+
+const ResourceLocked = createError(
+  'Resource is locked',
+  'E_RESOURCE_LOCKED',
+  423
+)
+
+const TooManyRequests = createError(
+  'Too many requests',
+  'E_TOO_MANY_REQUESTS',
+  429
+)
+
+// Usage
+if (isLocked) {
+  throw new ResourceLocked()
+}
+
+if (rateLimitExceeded) {
+  throw new TooManyRequests()
+}
+```
+
+### Error Handling in Controllers
+
+```typescript
+import { errors } from '@adonisjs/core'
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async show({ params, response }: HttpContext) {
+    const user = await User.find(params.id)
+    
+    if (!user) {
+      throw new errors.E_ROUTE_NOT_FOUND('User not found')
+    }
+    
+    return user
+  }
+}
+```
+
+### Global Error Handler
+
+```typescript
+import { errors, prettyPrintError } from '@adonisjs/core'
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class HttpExceptionHandler {
+  async handle(error: unknown, ctx: HttpContext) {
+    if (error instanceof errors.E_VALIDATION_FAILURE) {
+      return ctx.response.status(422).send({
+        errors: error.messages
+      })
+    }
+
+    if (error instanceof errors.E_AUTHORIZATION_FAILURE) {
+      return ctx.response.status(403).send({
+        message: 'Access denied'
+      })
+    }
+
+    // Log and display other errors
+    await prettyPrintError(error)
+    
+    return ctx.response.status(500).send({
+      message: 'Internal server error'
+    })
+  }
+}
+```
+
+### Catching Specific Errors
+
+```typescript
+import { errors } from '@adonisjs/core'
+
+try {
+  const encrypted = encryption.encrypt(data)
+} catch (error) {
+  if (error instanceof errors.E_ENCRYPTION_FAILED) {
+    logger.error('Encryption failed:', error.message)
+    throw new errors.E_INTERNAL_SERVER_ERROR(
+      'Unable to secure data'
+    )
+  }
+  throw error
+}
+```
+
+### Error with Cause Chain
+
+```typescript
+import { Exception } from '@adonisjs/core/exceptions'
+
+try {
+  await database.connect()
+} catch (error) {
+  throw new Exception('Database connection failed', {
+    code: 'E_DB_CONNECTION',
+    status: 500,
+    cause: error
+  })
+}
+```

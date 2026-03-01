@@ -1,0 +1,619 @@
+---
+title: Make Commands
+description: Complete reference for all make commands in AdonisJS to scaffold controllers, middleware, services, events, and other application components
+---
+
+AdonisJS provides a comprehensive set of `make` commands to quickly generate boilerplate code for various application components. All make commands support code generation via stubs and many automatically register the generated files in your application configuration.
+
+## make:command
+
+Create a new Ace command class.
+
+```bash
+node ace make:command SendEmails
+node ace make:command ProcessPayments
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the command class to create
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a command file in `commands/` directory:
+
+```typescript
+import { BaseCommand } from '@adonisjs/core/ace'
+
+export default class SendEmails extends BaseCommand {
+  static commandName = 'send:emails'
+  static description = ''
+
+  async run() {
+    this.logger.info('Hello world from SendEmails')
+  }
+}
+```
+
+## make:controller
+
+Create a new HTTP controller class.
+
+```bash
+node ace make:controller User
+node ace make:controller User store update destroy
+node ace make:controller User --resource
+node ace make:controller User --api
+node ace make:controller User --singular
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the controller
+</ParamField>
+
+<ParamField path="actions" type="string[]">
+  Create controller with custom method names
+</ParamField>
+
+<ParamField path="--resource" type="boolean">
+  Generate resourceful controller with methods to perform CRUD actions (index, create, store, show, edit, update, destroy)
+</ParamField>
+
+<ParamField path="--api" type="boolean">
+  Generate resourceful controller without the "edit" and "create" methods (index, store, show, update, destroy)
+</ParamField>
+
+<ParamField path="--singular" type="boolean">
+  Generate controller in singular form
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```bash Basic Controller
+node ace make:controller User
+```
+
+```bash With Custom Actions
+node ace make:controller User login logout register
+```
+
+```bash Resource Controller
+node ace make:controller Post --resource
+# Generates: index, create, store, show, edit, update, destroy
+```
+
+```bash API Controller
+node ace make:controller Post --api
+# Generates: index, store, show, update, destroy
+```
+</CodeGroup>
+
+### Generated File
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async index({}: HttpContext) {}
+  
+  async create({}: HttpContext) {}
+  
+  async store({}: HttpContext) {}
+  
+  async show({}: HttpContext) {}
+  
+  async edit({}: HttpContext) {}
+  
+  async update({}: HttpContext) {}
+  
+  async destroy({}: HttpContext) {}
+}
+```
+
+## make:middleware
+
+Create a new middleware class for HTTP requests.
+
+```bash
+node ace make:middleware Auth
+node ace make:middleware Auth --stack=server
+node ace make:middleware Auth --stack=named
+node ace make:middleware Auth --stack=router
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the middleware
+</ParamField>
+
+<ParamField path="--stack" type="'server' | 'named' | 'router'">
+  The stack in which to register the middleware. If not provided, you'll be prompted to select one.
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Middleware Stacks
+
+- **server** - Runs on every HTTP request before the route handler
+- **router** - Runs on specific routes or route groups
+- **named** - Named middleware that can be applied to specific routes
+
+### Generated File
+
+Creates a middleware file in `app/middleware/` and automatically registers it in `start/kernel.ts`:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class AuthMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    // Middleware logic
+    await next()
+  }
+}
+```
+
+## make:service
+
+Create a new service class.
+
+```bash
+node ace make:service UserService
+node ace make:service Auth/LoginService
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the service
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a service file in `app/services/`:
+
+```typescript
+export default class UserService {
+  // Service implementation
+}
+```
+
+## make:event
+
+Create a new event class.
+
+```bash
+node ace make:event UserRegistered
+node ace make:event OrderCompleted
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the event
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates an event file in `app/events/`:
+
+```typescript
+import { BaseEvent } from '@adonisjs/core/events'
+
+export default class UserRegistered extends BaseEvent {
+  // Event properties
+}
+```
+
+## make:listener
+
+Create a new event listener class.
+
+```bash
+node ace make:listener SendWelcomeEmail
+node ace make:listener SendWelcomeEmail --event=UserRegistered
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the event listener
+</ParamField>
+
+<ParamField path="--event" type="string">
+  Generate an event class alongside the listener and bind them together
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a listener file in `app/listeners/`:
+
+```typescript
+import UserRegistered from '#events/user_registered'
+
+export default class SendWelcomeEmail {
+  async handle(event: UserRegistered) {
+    // Listener logic
+  }
+}
+```
+
+When using `--event` flag, it first creates the event class, then creates the listener with proper type binding.
+
+## make:exception
+
+Create a new custom exception class.
+
+```bash
+node ace make:exception ValidationException
+node ace make:exception UnauthorizedException
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the exception
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates an exception file in `app/exceptions/`:
+
+```typescript
+import { Exception } from '@adonisjs/core/exceptions'
+
+export default class ValidationException extends Exception {
+  // Exception implementation
+}
+```
+
+## make:validator
+
+Create a new VineJS validator file.
+
+```bash
+node ace make:validator UserValidator
+node ace make:validator UserValidator --resource
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the validator file
+</ParamField>
+
+<ParamField path="--resource" type="boolean">
+  Create a file with pre-defined validators for create and update actions
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+<CodeGroup>
+```typescript Basic Validator
+import vine from '@vinejs/vine'
+
+export const userValidator = vine.compile(
+  vine.object({
+    // Validation rules
+  })
+)
+```
+
+```typescript Resource Validator
+import vine from '@vinejs/vine'
+
+export const createUserValidator = vine.compile(
+  vine.object({
+    // Create validation rules
+  })
+)
+
+export const updateUserValidator = vine.compile(
+  vine.object({
+    // Update validation rules
+  })
+)
+```
+</CodeGroup>
+
+## make:provider
+
+Create a new service provider class.
+
+```bash
+node ace make:provider AppProvider
+node ace make:provider AppProvider --register
+node ace make:provider AppProvider --no-register
+node ace make:provider AppProvider --environments=web,console
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the provider
+</ParamField>
+
+<ParamField path="--register" type="boolean">
+  Auto register the provider inside the .adonisrc.ts file. If not provided, you'll be prompted.
+</ParamField>
+
+<ParamField path="--environments" type="string[]">
+  Define the provider environment. Accepted values are "web", "console", "test", "repl"
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a provider file in `providers/` and optionally registers it in `.adonisrc.ts`:
+
+```typescript
+import type { ApplicationService } from '@adonisjs/core/types'
+
+export default class AppProvider {
+  constructor(protected app: ApplicationService) {}
+
+  register() {
+    // Register bindings
+  }
+
+  async boot() {
+    // Bootstrap logic
+  }
+
+  async start() {
+    // Start logic
+  }
+
+  async ready() {
+    // Ready logic
+  }
+
+  async shutdown() {
+    // Shutdown logic
+  }
+}
+```
+
+## make:preload
+
+Create a new preload file inside the start directory.
+
+```bash
+node ace make:preload routes
+node ace make:preload events --register
+node ace make:preload kernel --no-register
+node ace make:preload view --environments=web
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the preload file
+</ParamField>
+
+<ParamField path="--register" type="boolean">
+  Auto register the preload file inside the .adonisrc.ts file. If not provided, you'll be prompted.
+</ParamField>
+
+<ParamField path="--environments" type="string[]">
+  Define the preload file's environment. Accepted values are "web", "console", "test", "repl"
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a preload file in `start/` and optionally registers it in `.adonisrc.ts`:
+
+```typescript
+// Preload file logic
+```
+
+## make:test
+
+Create a new Japa test file.
+
+```bash
+node ace make:test UserController
+node ace make:test UserModel --suite=unit
+node ace make:test AuthService --suite=integration
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the test file
+</ParamField>
+
+<ParamField path="--suite" type="string">
+  The suite for which to create the test file. If not provided and multiple suites exist, you'll be prompted to select one.
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a test file in the appropriate suite directory (e.g., `tests/unit/`, `tests/functional/`):
+
+```typescript
+import { test } from '@japa/runner'
+
+test.group('UserController', () => {
+  test('example test', async ({ assert }) => {
+    assert.isTrue(true)
+  })
+})
+```
+
+## make:view
+
+Create a new Edge.js template file.
+
+```bash
+node ace make:view home
+node ace make:view users/profile
+node ace make:view components/navbar
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Name of the template
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a template file in `resources/views/`:
+
+```edge
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page Title</title>
+</head>
+<body>
+  
+</body>
+</html>
+```
+
+## make:transformer
+
+Create a new transformer class.
+
+```bash
+node ace make:transformer User
+node ace make:transformer Post
+```
+
+### Options
+
+<ParamField path="name" type="string" required>
+  Entity name for which to generate the transformer
+</ParamField>
+
+<ParamField path="--contents-from" type="string">
+  Use the contents of the given file as the generated output
+</ParamField>
+
+### Generated File
+
+Creates a transformer file in `app/transformers/`:
+
+```typescript
+import User from '#models/user'
+
+export default class UserTransformer {
+  transform(user: User) {
+    return {
+      id: user.id,
+      // Transform logic
+    }
+  }
+}
+```
+
+## Common Flags
+
+All make commands support the following common flag:
+
+### --contents-from
+
+Use the contents of a specified file as the generated output instead of using the default stub template:
+
+```bash
+node ace make:controller User --contents-from=./templates/my-controller.txt
+node ace make:service UserService --contents-from=./custom-service.ts
+```
+
+This is useful when:
+- You have custom templates for specific project patterns
+- You want to copy an existing file as a starting point
+- You need to bypass the default stub templates
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use consistent naming conventions">
+    Follow AdonisJS naming conventions:
+    
+    - Controllers: PascalCase, plural (e.g., `UsersController`)
+    - Services: PascalCase with "Service" suffix (e.g., `UserService`)
+    - Middleware: PascalCase (e.g., `AuthMiddleware`)
+    - Events: PascalCase, past tense (e.g., `UserRegistered`)
+    - Validators: camelCase with "Validator" suffix (e.g., `userValidator`)
+  </Accordion>
+  
+  <Accordion title="Organize with namespaces">
+    Use directory separators to organize related files:
+    
+    ```bash
+    node ace make:controller Admin/UsersController
+    node ace make:service Auth/LoginService
+    node ace make:event User/Registered
+    ```
+  </Accordion>
+  
+  <Accordion title="Choose the right controller type">
+    - Use `--resource` for full CRUD with web views (includes `create` and `edit`)
+    - Use `--api` for REST APIs without view-rendering actions
+    - Use custom actions for specific use cases (e.g., login, logout, register)
+  </Accordion>
+  
+  <Accordion title="Leverage auto-registration">
+    Use `--register` flags when creating providers and preload files to automatically add them to `.adonisrc.ts`:
+    
+    ```bash
+    node ace make:provider CacheProvider --register --environments=web,console
+    node ace make:preload routes --register --environments=web
+    ```
+  </Accordion>
+</AccordionGroup>

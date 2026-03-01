@@ -1,0 +1,392 @@
+---
+title: Middleware
+description: Use middleware to process HTTP requests before they reach your route handlers in AdonisJS
+---
+
+Middleware are functions that execute before your route handlers. They can transform the request, validate authentication, log requests, or terminate the request early.
+
+## Creating middleware
+
+Use the `make:middleware` Ace command to create a new middleware:
+
+```bash
+node ace make:middleware Auth
+```
+
+You'll be prompted to select a middleware stack:
+- **server**: Runs for all HTTP requests
+- **router**: Runs for all matched routes
+- **named**: Applied selectively to specific routes
+
+This creates a middleware file at `app/middleware/auth_middleware.ts`:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class AuthMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    /**
+     * Middleware logic goes here (before the next call)
+     */
+    console.log(ctx)
+
+    /**
+     * Call next method in the pipeline and return its output
+     */
+    const output = await next()
+    return output
+  }
+}
+```
+
+## Middleware execution flow
+
+Middleware execute in a pipeline:
+
+```typescript
+export default class LoggerMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    // Code here runs BEFORE the route handler
+    console.log('Request received:', ctx.request.url())
+    
+    // Call the next middleware/handler
+    const output = await next()
+    
+    // Code here runs AFTER the route handler
+    console.log('Response sent:', ctx.response.getStatus())
+    
+    return output
+  }
+}
+```
+
+## Middleware stacks
+
+### Server middleware
+
+Server middleware runs for **every HTTP request**, even if the route doesn't exist. Configure in `start/kernel.ts`:
+
+```typescript
+import server from '@adonisjs/core/services/server'
+
+server.use([
+  () => import('#middleware/container_bindings_middleware'),
+  () => import('#middleware/logger_middleware'),
+  () => import('@adonisjs/bodyparser/bodyparser_middleware'),
+])
+```
+
+Use cases:
+- CORS handling
+- Request logging
+- Body parsing
+- Setting global headers
+
+### Router middleware
+
+Router middleware runs only for **matched routes**. Configure in `start/kernel.ts`:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+router.use([
+  () => import('#middleware/auth_middleware'),
+])
+```
+
+Use cases:
+- Authentication checks
+- CSRF protection
+- Rate limiting for all routes
+
+### Named middleware
+
+Named middleware is applied **selectively to specific routes**. Register in `start/kernel.ts`:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+export const middleware = router.named({
+  auth: () => import('#middleware/auth_middleware'),
+  admin: () => import('#middleware/admin_middleware'),
+  throttle: () => import('#middleware/throttle_middleware'),
+})
+```
+
+Apply to routes:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+router
+  .get('/dashboard', '#controllers/dashboard_controller.index')
+  .use(middleware.auth())
+
+router
+  .get('/admin', '#controllers/admin_controller.index')
+  .use([middleware.auth(), middleware.admin()])
+```
+
+## Writing middleware logic
+
+### Authentication middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class AuthMiddleware {
+  async handle({ auth, response }: HttpContext, next: NextFn) {
+    // Check if user is authenticated
+    try {
+      await auth.authenticate()
+    } catch (error) {
+      return response.unauthorized({ error: 'Unauthorized' })
+    }
+
+    // Continue to the next middleware/handler
+    return await next()
+  }
+}
+```
+
+### CORS middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class CorsMiddleware {
+  async handle({ request, response }: HttpContext, next: NextFn) {
+    // Set CORS headers
+    response.header('Access-Control-Allow-Origin', '*')
+    response.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE')
+    response.header('Access-Control-Allow-Headers', 'Content-Type')
+
+    // Handle preflight requests
+    if (request.method() === 'OPTIONS') {
+      return response.noContent()
+    }
+
+    return await next()
+  }
+}
+```
+
+### Request logging middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class LoggerMiddleware {
+  async handle({ request, response, logger }: HttpContext, next: NextFn) {
+    const start = Date.now()
+    
+    // Log incoming request
+    logger.info(`→ ${request.method()} ${request.url()}`)
+
+    // Continue to next middleware/handler
+    const output = await next()
+
+    // Log response
+    const duration = Date.now() - start
+    logger.info(`← ${response.getStatus()} ${request.url()} (${duration}ms)`)
+
+    return output
+  }
+}
+```
+
+### Rate limiting middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class ThrottleMiddleware {
+  async handle({ request, response }: HttpContext, next: NextFn) {
+    const key = request.ip()
+    const requests = await redis.incr(`rate_limit:${key}`)
+    
+    if (requests === 1) {
+      await redis.expire(`rate_limit:${key}`, 60) // 60 seconds
+    }
+    
+    if (requests > 100) {
+      return response.tooManyRequests({
+        error: 'Too many requests'
+      })
+    }
+
+    return await next()
+  }
+}
+```
+
+## Terminating requests early
+
+Middleware can terminate the request without calling `next()`:
+
+```typescript
+export default class MaintenanceMiddleware {
+  async handle({ response }: HttpContext, next: NextFn) {
+    const isMaintenanceMode = true // Check from config or database
+    
+    if (isMaintenanceMode) {
+      return response.serviceUnavailable({
+        message: 'Service is under maintenance'
+      })
+    }
+
+    return await next()
+  }
+}
+```
+
+## Middleware with parameters
+
+Pass parameters to middleware:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class RoleMiddleware {
+  async handle(
+    { auth, response }: HttpContext,
+    next: NextFn,
+    options: { role: string }
+  ) {
+    const user = await auth.user
+    
+    if (user.role !== options.role) {
+      return response.forbidden({ error: 'Access denied' })
+    }
+
+    return await next()
+  }
+}
+```
+
+Use it in routes:
+
+```typescript
+router
+  .get('/admin', '#controllers/admin_controller.index')
+  .use(middleware.role({ role: 'admin' }))
+```
+
+## Applying middleware to route groups
+
+Apply middleware to multiple routes using route groups:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+import { middleware } from '#start/kernel'
+
+router.group(() => {
+  router.get('/posts', '#controllers/posts_controller.index')
+  router.post('/posts', '#controllers/posts_controller.store')
+  router.delete('/posts/:id', '#controllers/posts_controller.destroy')
+}).middleware([middleware.auth()])
+```
+
+## Nested middleware
+
+Combine middleware from groups and individual routes:
+
+```typescript
+router.group(() => {
+  // All routes in this group require authentication
+  
+  router.get('/posts', '#controllers/posts_controller.index')
+  
+  router
+    .delete('/posts/:id', '#controllers/posts_controller.destroy')
+    .use(middleware.admin()) // Also requires admin role
+    
+}).middleware([middleware.auth()])
+```
+
+## Middleware execution order
+
+Middleware executes in this order:
+
+1. **Server middleware** (all requests)
+2. **Router middleware** (matched routes only)
+3. **Route group middleware** (outer to inner groups)
+4. **Route-specific middleware**
+5. **Route handler**
+
+Example:
+
+```typescript
+// start/kernel.ts
+server.use([() => import('#middleware/logger_middleware')])
+router.use([() => import('#middleware/cors_middleware')])
+
+// start/routes.ts
+router.group(() => {
+  router
+    .get('/admin/users', '#controllers/admin/users_controller.index')
+    .use(middleware.admin())
+}).middleware([middleware.auth()])
+
+// Execution order:
+// 1. LoggerMiddleware
+// 2. CorsMiddleware
+// 3. AuthMiddleware
+// 4. AdminMiddleware
+// 5. UsersController.index
+```
+
+## Inline middleware
+
+Define middleware inline for simple use cases:
+
+```typescript
+router
+  .get('/users', '#controllers/users_controller.index')
+  .use(async ({ request, response }, next) => {
+    if (!request.header('api-key')) {
+      return response.unauthorized({ error: 'API key required' })
+    }
+    return await next()
+  })
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Always call next()">
+    Unless you're intentionally terminating the request, always call `next()` and return its output. Forgetting to call `next()` will cause requests to hang.
+  </Accordion>
+  
+  <Accordion title="Use appropriate middleware stack">
+    - Use **server** middleware only for logic that applies to ALL requests
+    - Use **router** middleware for logic that applies to all matched routes
+    - Use **named** middleware for selective application to specific routes
+  </Accordion>
+  
+  <Accordion title="Keep middleware focused">
+    Each middleware should have a single responsibility. If your middleware is doing multiple things, split it into separate middleware.
+  </Accordion>
+  
+  <Accordion title="Handle errors gracefully">
+    Wrap middleware logic in try-catch blocks to handle errors:
+    
+    ```typescript
+    async handle(ctx: HttpContext, next: NextFn) {
+      try {
+        await this.performCheck(ctx)
+        return await next()
+      } catch (error) {
+        return ctx.response.internalServerError({ error: error.message })
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>

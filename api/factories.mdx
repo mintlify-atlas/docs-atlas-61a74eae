@@ -1,0 +1,619 @@
+---
+title: Factories API
+description: Factory classes for creating and configuring AdonisJS applications, Ignitor instances, and test utilities with fluent APIs
+---
+
+The Factories module provides factory classes that make it easy to create and configure AdonisJS applications, Ignitor instances, and test utilities. These factories are particularly useful for testing scenarios and programmatic application setup.
+
+## Import
+
+```typescript
+import { 
+  IgnitorFactory, 
+  TestUtilsFactory,
+  AceFactory 
+} from '@adonisjs/core/factories'
+```
+
+## IgnitorFactory
+
+Factory for creating and configuring AdonisJS Ignitor instances. The Ignitor is responsible for bootstrapping AdonisJS applications.
+
+### Constructor
+
+Create a new IgnitorFactory instance.
+
+```typescript
+const factory = new IgnitorFactory()
+```
+
+### Methods
+
+#### withCoreProviders
+
+Include core AdonisJS providers when booting the application.
+
+**Returns:** `this` - Factory instance for method chaining
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreProviders()
+  .create(new URL('../', import.meta.url))
+```
+
+This adds the following core providers:
+- `@adonisjs/core/providers/app_provider`
+- `@adonisjs/core/providers/hash_provider`
+- `@adonisjs/core/providers/repl_provider`
+
+#### withCoreConfig
+
+Merge default configuration for core AdonisJS features.
+
+**Returns:** `this` - Factory instance for method chaining
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .create(appRoot)
+```
+
+This adds default configurations for:
+- HTTP server settings
+- Hash driver (scrypt)
+- Logger configuration
+- Body parser settings
+- Encryption (AES-256-GCM)
+- Validator settings
+
+<Note>
+A shallow merge is performed with any existing configuration.
+</Note>
+
+#### merge
+
+Merge custom factory parameters with existing configuration.
+
+<ParamField path="params" type="object" required>
+  Parameters to merge
+  
+  <ParamField path="params.config" type="Record<string, any>">
+    Application configuration to merge
+  </ParamField>
+  
+  <ParamField path="params.rcFileContents" type="Record<string, any>">
+    RC file contents to merge (providers, commands, etc.)
+  </ParamField>
+</ParamField>
+
+**Returns:** `this` - Factory instance for method chaining
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .merge({
+    config: {
+      database: {
+        connection: 'mysql',
+        connections: {
+          mysql: {
+            client: 'mysql2',
+            connection: {
+              host: '127.0.0.1',
+              database: 'test_db'
+            }
+          }
+        }
+      }
+    },
+    rcFileContents: {
+      providers: [
+        () => import('@adonisjs/lucid/database_provider')
+      ],
+      commands: [
+        () => import('./commands/CustomCommand.ts')
+      ]
+    }
+  })
+  .create(appRoot)
+```
+
+#### preload
+
+Define preload actions to run during application initialization.
+
+<ParamField path="action" type="(app: ApplicationService) => void | Promise<void>" required>
+  Function to execute during preload phase
+</ParamField>
+
+**Returns:** `this` - Factory instance for method chaining
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .preload((app) => {
+    // Register custom bindings
+    app.container.bind('customService', () => {
+      return new CustomService()
+    })
+  })
+  .preload(async (app) => {
+    // Async initialization
+    const config = await loadRemoteConfig()
+    app.container.bind('remoteConfig', () => config)
+  })
+  .create(appRoot)
+```
+
+<Note>
+Preload actions are executed after the application is booted.
+</Note>
+
+#### create
+
+Create a configured Ignitor instance.
+
+<ParamField path="appRoot" type="URL" required>
+  Application root directory URL
+</ParamField>
+
+<ParamField path="options" type="IgnitorOptions">
+  Optional Ignitor configuration options
+  
+  <ParamField path="options.importer" type="function">
+    Custom module importer function
+  </ParamField>
+</ParamField>
+
+**Returns:** `Ignitor` - Configured Ignitor instance
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .create(new URL('../', import.meta.url))
+
+const app = ignitor.createApp('web')
+await app.boot()
+await app.start()
+```
+
+### Usage Examples
+
+#### Basic Setup
+
+```typescript
+import { IgnitorFactory } from '@adonisjs/core/factories'
+
+const ignitor = new IgnitorFactory()
+  .withCoreProviders()
+  .withCoreConfig()
+  .create(new URL('../', import.meta.url))
+
+const app = ignitor.createApp('web')
+await app.boot()
+```
+
+#### Testing Setup
+
+```typescript
+import { test } from '@japa/runner'
+import { IgnitorFactory } from '@adonisjs/core/factories'
+
+test('can create application', async ({ assert }) => {
+  const ignitor = new IgnitorFactory()
+    .withCoreConfig()
+    .withCoreProviders()
+    .merge({
+      config: {
+        database: {
+          connection: 'sqlite',
+          connections: {
+            sqlite: {
+              client: 'sqlite3',
+              connection: { filename: ':memory:' }
+            }
+          }
+        }
+      }
+    })
+    .create(new URL('../', import.meta.url))
+  
+  const app = ignitor.createApp('test')
+  await app.boot()
+  
+  assert.isTrue(app.isBooted)
+})
+```
+
+#### Custom Providers
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreProviders()
+  .merge({
+    rcFileContents: {
+      providers: [
+        () => import('@adonisjs/lucid/database_provider'),
+        () => import('@adonisjs/auth/auth_provider'),
+        () => import('./providers/AppProvider.ts')
+      ]
+    }
+  })
+  .create(appRoot)
+```
+
+#### Preload Actions
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .preload((app) => {
+    // Register global error handler
+    app.container.bind('errorHandler', () => {
+      return new CustomErrorHandler()
+    })
+  })
+  .preload(async (app) => {
+    // Initialize database connection
+    const db = await app.container.make('lucid.db')
+    await db.connection().raw('SELECT 1')
+  })
+  .create(appRoot)
+```
+
+## TestUtilsFactory
+
+Factory for creating TestUtils instances for AdonisJS testing scenarios.
+
+### Constructor
+
+Create a new TestUtilsFactory instance.
+
+```typescript
+const factory = new TestUtilsFactory()
+```
+
+### Methods
+
+#### create (from Ignitor)
+
+Create TestUtils from an existing Ignitor instance.
+
+<ParamField path="ignitor" type="Ignitor" required>
+  Existing Ignitor instance configured for testing
+</ParamField>
+
+**Returns:** `TestUtils` - Test utilities instance
+
+```typescript
+import { IgnitorFactory, TestUtilsFactory } from '@adonisjs/core/factories'
+
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .create(appRoot)
+
+const testUtils = new TestUtilsFactory().create(ignitor)
+await testUtils.boot()
+```
+
+#### create (from URL)
+
+Create TestUtils from application root URL.
+
+<ParamField path="appRoot" type="URL" required>
+  Application root directory URL
+</ParamField>
+
+<ParamField path="options" type="IgnitorOptions">
+  Optional Ignitor configuration options
+</ParamField>
+
+**Returns:** `TestUtils` - Test utilities instance
+
+```typescript
+const testUtils = new TestUtilsFactory()
+  .create(new URL('../', import.meta.url))
+
+await testUtils.boot()
+
+const ctx = await testUtils.createHttpContext()
+```
+
+<Note>
+When creating from URL, core providers and config are automatically included.
+</Note>
+
+### Usage Examples
+
+#### Basic Testing Setup
+
+```typescript
+import { test } from '@japa/runner'
+import { TestUtilsFactory } from '@adonisjs/core/factories'
+
+test.group('Users', (group) => {
+  let testUtils
+  
+  group.setup(async () => {
+    testUtils = new TestUtilsFactory()
+      .create(new URL('../../', import.meta.url))
+    await testUtils.boot()
+  })
+  
+  test('can create http context', async ({ assert }) => {
+    const ctx = await testUtils.createHttpContext()
+    assert.exists(ctx.request)
+    assert.exists(ctx.response)
+  })
+})
+```
+
+#### Shared Test Setup
+
+```typescript
+// tests/helpers.ts
+import { TestUtilsFactory } from '@adonisjs/core/factories'
+
+export async function setupTestUtils() {
+  const factory = new TestUtilsFactory()
+  const testUtils = factory.create(new URL('../../', import.meta.url))
+  await testUtils.boot()
+  return testUtils
+}
+
+// tests/users.spec.ts
+import { test } from '@japa/runner'
+import { setupTestUtils } from './helpers.ts'
+
+test.group('Users', (group) => {
+  let testUtils
+  
+  group.setup(async () => {
+    testUtils = await setupTestUtils()
+  })
+  
+  // ... your tests
+})
+```
+
+#### With Custom Ignitor
+
+```typescript
+import { IgnitorFactory, TestUtilsFactory } from '@adonisjs/core/factories'
+
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .merge({
+    config: {
+      database: { connection: 'sqlite' }
+    }
+  })
+  .preload(async (app) => {
+    // Custom test setup
+    await seedDatabase(app)
+  })
+  .create(appRoot)
+
+const testUtils = new TestUtilsFactory().create(ignitor)
+await testUtils.boot()
+```
+
+## AceFactory
+
+Factory for creating and testing Ace commands.
+
+```typescript
+import { AceFactory } from '@adonisjs/core/factories'
+```
+
+<Note>
+Detailed documentation for AceFactory is available in the Ace commands section.
+</Note>
+
+## Additional Factory Exports
+
+The factories module also re-exports factories from related packages:
+
+### HTTP Factories
+
+```typescript
+// Re-exported from @adonisjs/http-server/factories
+import { 
+  RequestFactory,
+  ResponseFactory,
+  HttpContextFactory 
+} from '@adonisjs/core/factories'
+```
+
+### Hash Factories
+
+```typescript
+// Re-exported from @adonisjs/hash/factories
+import { HashFactory } from '@adonisjs/core/factories'
+```
+
+### Encryption Factories
+
+```typescript
+// Re-exported from @boringnode/encryption/factories
+import { EncryptionFactory } from '@adonisjs/core/factories'
+```
+
+### Application Factories
+
+```typescript
+// Re-exported from @adonisjs/application/factories
+import { ApplicationFactory } from '@adonisjs/core/factories'
+```
+
+Refer to the respective package documentation for detailed usage of these factories.
+
+## Best Practices
+
+### 1. Reuse Factory Configurations
+
+Create a base factory configuration for tests:
+
+```typescript
+// tests/factories.ts
+export function createTestIgnitor() {
+  return new IgnitorFactory()
+    .withCoreConfig()
+    .withCoreProviders()
+    .merge({
+      config: {
+        database: { connection: 'sqlite' }
+      }
+    })
+}
+```
+
+### 2. Use Method Chaining
+
+Take advantage of fluent API:
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .merge({ config: { /* ... */ } })
+  .preload(setupApp)
+  .create(appRoot)
+```
+
+### 3. Isolate Test Environments
+
+```typescript
+test.group('Integration Tests', (group) => {
+  let testUtils
+  let app
+  
+  group.setup(async () => {
+    const ignitor = new IgnitorFactory()
+      .withCoreConfig()
+      .withCoreProviders()
+      .create(appRoot)
+    
+    app = ignitor.createApp('test')
+    await app.boot()
+    
+    testUtils = new TestUtils(app)
+    await testUtils.boot()
+  })
+  
+  group.teardown(async () => {
+    await app.terminate()
+  })
+})
+```
+
+### 4. Custom Preload Actions
+
+Use preload for test-specific setup:
+
+```typescript
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .preload(async (app) => {
+    // Seed test data
+    const db = await app.container.make('lucid.db')
+    await db.table('users').insert({ email: 'test@example.com' })
+  })
+  .create(appRoot)
+```
+
+### 5. Environment-Specific Configuration
+
+```typescript
+const isCI = process.env.CI === 'true'
+
+const ignitor = new IgnitorFactory()
+  .withCoreConfig()
+  .withCoreProviders()
+  .merge({
+    config: {
+      database: {
+        connection: isCI ? 'pg' : 'sqlite'
+      }
+    }
+  })
+  .create(appRoot)
+```
+
+## Complete Testing Example
+
+```typescript
+import { test } from '@japa/runner'
+import { IgnitorFactory, TestUtilsFactory } from '@adonisjs/core/factories'
+import supertest from 'supertest'
+
+test.group('User Registration', (group) => {
+  let testUtils
+  let closeServer
+  
+  group.setup(async () => {
+    // Create custom ignitor
+    const ignitor = new IgnitorFactory()
+      .withCoreConfig()
+      .withCoreProviders()
+      .merge({
+        config: {
+          database: {
+            connection: 'sqlite',
+            connections: {
+              sqlite: {
+                client: 'sqlite3',
+                connection: { filename: ':memory:' }
+              }
+            }
+          }
+        },
+        rcFileContents: {
+          providers: [
+            () => import('@adonisjs/lucid/database_provider')
+          ]
+        }
+      })
+      .preload(async (app) => {
+        // Run migrations
+        const db = await app.container.make('lucid.db')
+        await db.connection().schema.createTable('users', (table) => {
+          table.increments('id')
+          table.string('email').unique()
+          table.string('password')
+        })
+      })
+      .create(new URL('../../', import.meta.url))
+    
+    // Create test utils
+    testUtils = new TestUtilsFactory().create(ignitor)
+    await testUtils.boot()
+    
+    // Start HTTP server
+    const httpUtils = testUtils.httpServer()
+    closeServer = await httpUtils.start()
+  })
+  
+  group.teardown(async () => {
+    await closeServer()
+  })
+  
+  test('can register new user', async ({ assert }) => {
+    const baseUrl = `http://${process.env.HOST}:${process.env.PORT}`
+    
+    const response = await supertest(baseUrl)
+      .post('/register')
+      .send({
+        email: 'test@example.com',
+        password: 'secret123'
+      })
+      .expect(201)
+    
+    assert.exists(response.body.id)
+    assert.equal(response.body.email, 'test@example.com')
+  })
+})
+```

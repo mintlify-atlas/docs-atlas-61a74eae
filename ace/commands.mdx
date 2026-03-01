@@ -1,0 +1,669 @@
+---
+title: Working with Commands
+description: Learn how to create custom Ace commands, use decorators for arguments and flags, implement lifecycle hooks, and leverage dependency injection
+---
+
+Ace commands are the building blocks of your CLI interface in AdonisJS. This guide covers everything you need to know about creating and working with commands.
+
+## Creating a Command
+
+You can create a new command using the `make:command` command:
+
+```bash
+node ace make:command SendEmails
+```
+
+This creates a new command file in the `commands/` directory:
+
+```typescript
+// commands/send_emails.ts
+import { BaseCommand } from '@adonisjs/core/ace'
+
+export default class SendEmails extends BaseCommand {
+  static commandName = 'send:emails'
+  static description = ''
+
+  async run() {
+    this.logger.info('Hello world from SendEmails')
+  }
+}
+```
+
+## Command Structure
+
+### Command Name
+
+The `commandName` property defines how users will invoke your command:
+
+```typescript
+export default class SendEmails extends BaseCommand {
+  static commandName = 'send:emails'
+}
+```
+
+Users run it with:
+
+```bash
+node ace send:emails
+```
+
+### Description
+
+The `description` is shown in the commands list and help output:
+
+```typescript
+export default class SendEmails extends BaseCommand {
+  static commandName = 'send:emails'
+  static description = 'Send pending emails from the queue'
+}
+```
+
+### Help Text
+
+You can provide additional help text using the `help` property:
+
+```typescript
+export default class SendEmails extends BaseCommand {
+  static commandName = 'send:emails'
+  static description = 'Send pending emails from the queue'
+  
+  static help = [
+    'This command processes the email queue and sends all pending emails.',
+    '',
+    'You can filter by email type:',
+    '```',
+    '{{ binaryName }} send:emails --type=newsletter',
+    '```',
+  ]
+}
+```
+
+## Arguments and Flags
+
+### Arguments
+
+Arguments are positional values passed to your command. Define them using the `@args` decorator:
+
+```typescript
+import { BaseCommand, args } from '@adonisjs/core/ace'
+
+export default class MakeUser extends BaseCommand {
+  static commandName = 'make:user'
+  
+  @args.string({ description: 'Name of the user' })
+  declare name: string
+  
+  async run() {
+    this.logger.info(`Creating user: ${this.name}`)
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace make:user John
+```
+
+#### Multiple Arguments
+
+You can accept multiple arguments:
+
+```typescript
+export default class CreatePost extends BaseCommand {
+  static commandName = 'create:post'
+  
+  @args.string({ description: 'Post title' })
+  declare title: string
+  
+  @args.string({ description: 'Post author' })
+  declare author: string
+  
+  async run() {
+    this.logger.info(`Creating post "${this.title}" by ${this.author}`)
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace create:post "Hello World" John
+```
+
+#### Spread Arguments
+
+Use `@args.spread()` to accept a variable number of arguments:
+
+```typescript
+export default class DeleteFiles extends BaseCommand {
+  static commandName = 'delete:files'
+  
+  @args.spread({ description: 'Files to delete', required: false })
+  declare files?: string[]
+  
+  async run() {
+    this.logger.info(`Deleting files: ${this.files?.join(', ')}`)
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace delete:files file1.txt file2.txt file3.txt
+```
+
+### Flags
+
+Flags are named options passed with `--` or `-` prefix. Define them using the `@flags` decorator:
+
+#### Boolean Flags
+
+```typescript
+import { BaseCommand, flags } from '@adonisjs/core/ace'
+
+export default class Serve extends BaseCommand {
+  static commandName = 'serve'
+  
+  @flags.boolean({ 
+    description: 'Watch filesystem and restart on changes',
+    alias: 'w' 
+  })
+  declare watch: boolean
+  
+  async run() {
+    if (this.watch) {
+      this.logger.info('Starting with file watcher')
+    }
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace serve --watch
+node ace serve -w
+```
+
+#### String Flags
+
+```typescript
+export default class Deploy extends BaseCommand {
+  static commandName = 'deploy'
+  
+  @flags.string({ 
+    description: 'Environment to deploy to',
+    alias: 'e'
+  })
+  declare environment?: string
+  
+  async run() {
+    const env = this.environment || 'production'
+    this.logger.info(`Deploying to ${env}`)
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace deploy --environment=staging
+node ace deploy -e staging
+```
+
+#### Number Flags
+
+```typescript
+export default class Test extends BaseCommand {
+  static commandName = 'test'
+  
+  @flags.number({ description: 'Timeout in milliseconds' })
+  declare timeout?: number
+  
+  async run() {
+    this.logger.info(`Timeout: ${this.timeout || 5000}ms`)
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace test --timeout=10000
+```
+
+#### Array Flags
+
+```typescript
+export default class Test extends BaseCommand {
+  static commandName = 'test'
+  
+  @flags.array({ description: 'Test files to run' })
+  declare files?: string[]
+  
+  async run() {
+    this.logger.info(`Running tests: ${this.files?.join(', ')}`)
+  }
+}
+```
+
+Usage:
+
+```bash
+node ace test --files=user.spec.ts --files=post.spec.ts
+```
+
+#### Negated Boolean Flags
+
+You can show negated variants in help using `showNegatedVariantInHelp`:
+
+```typescript
+export default class Serve extends BaseCommand {
+  static commandName = 'serve'
+  
+  @flags.boolean({
+    description: 'Clear console on restart',
+    showNegatedVariantInHelp: true,
+    default: true
+  })
+  declare clear?: boolean
+}
+```
+
+Usage:
+
+```bash
+node ace serve --clear    # Enable clearing (default)
+node ace serve --no-clear # Disable clearing
+```
+
+## Lifecycle Hooks
+
+Commands support lifecycle hooks that run at different stages:
+
+### prepare()
+
+Runs first, before any user interaction. Use it to set up the command state:
+
+```typescript
+export default class MakeController extends BaseCommand {
+  static commandName = 'make:controller'
+  
+  @args.string()
+  declare name: string
+  
+  @flags.boolean()
+  declare resource: boolean
+  
+  protected stubPath = 'controller/main.stub'
+  
+  async prepare() {
+    if (this.resource) {
+      this.stubPath = 'controller/resource.stub'
+    }
+  }
+  
+  async run() {
+    // Use this.stubPath
+  }
+}
+```
+
+### interact()
+
+Runs after `prepare()`. Use it to prompt the user for additional input:
+
+```typescript
+export default class MakeMiddleware extends BaseCommand {
+  static commandName = 'make:middleware'
+  
+  @args.string()
+  declare name: string
+  
+  @flags.string()
+  declare stack?: 'server' | 'named' | 'router'
+  
+  async interact() {
+    if (!this.stack) {
+      this.stack = await this.prompt.choice(
+        'Select middleware stack',
+        ['server', 'router', 'named']
+      )
+    }
+  }
+  
+  async run() {
+    this.logger.info(`Creating ${this.stack} middleware: ${this.name}`)
+  }
+}
+```
+
+### run()
+
+The main command logic. This is where you implement your command's functionality:
+
+```typescript
+export default class SendEmails extends BaseCommand {
+  static commandName = 'send:emails'
+  
+  async run() {
+    this.logger.info('Sending emails...')
+    // Your logic here
+    this.logger.success('Emails sent!')
+  }
+}
+```
+
+### completed()
+
+Runs after the command completes or fails. You can access errors via `this.error`:
+
+```typescript
+export default class Migrate extends BaseCommand {
+  static commandName = 'migrate'
+  
+  async run() {
+    // Migration logic
+  }
+  
+  async completed() {
+    if (this.error) {
+      this.logger.error('Migration failed!')
+      // Return true to suppress default error reporting
+      return true
+    }
+    
+    this.logger.success('Migration completed!')
+  }
+}
+```
+
+## User Interaction
+
+### Logger
+
+Use the logger to output messages:
+
+```typescript
+export default class MyCommand extends BaseCommand {
+  async run() {
+    this.logger.info('Information message')
+    this.logger.success('Success message')
+    this.logger.warning('Warning message')
+    this.logger.error('Error message')
+    this.logger.debug('Debug message')
+  }
+}
+```
+
+### Prompts
+
+Use prompts to ask for user input:
+
+#### Text Input
+
+```typescript
+const name = await this.prompt.ask('What is your name?', {
+  validate(value) {
+    return value.length > 0 ? true : 'Name is required'
+  }
+})
+```
+
+#### Secure Input
+
+```typescript
+const password = await this.prompt.secure('Enter password')
+```
+
+#### Confirmation
+
+```typescript
+const confirmed = await this.prompt.confirm('Are you sure?')
+if (!confirmed) {
+  return
+}
+```
+
+#### Choice
+
+```typescript
+const env = await this.prompt.choice(
+  'Select environment',
+  ['development', 'staging', 'production']
+)
+```
+
+#### Multiple Choice
+
+```typescript
+const features = await this.prompt.multiple(
+  'Select features to enable',
+  ['auth', 'database', 'cache', 'queue']
+)
+```
+
+## Dependency Injection
+
+Commands support full dependency injection. You can inject services into lifecycle methods:
+
+```typescript
+import { BaseCommand } from '@adonisjs/core/ace'
+import UserService from '#services/user_service'
+
+export default class CreateUser extends BaseCommand {
+  static commandName = 'create:user'
+  
+  @args.string()
+  declare email: string
+  
+  async run(userService: UserService) {
+    const user = await userService.create({ email: this.email })
+    this.logger.success(`User created: ${user.id}`)
+  }
+}
+```
+
+## Accessing the Application
+
+Commands have access to the application instance via `this.app`:
+
+```typescript
+export default class MyCommand extends BaseCommand {
+  async run() {
+    // Access configuration
+    const appKey = this.app.config.get('app.appKey')
+    
+    // Access RC file configuration
+    const providers = this.app.rcFile.providers
+    
+    // Access container
+    const userService = await this.app.container.make('UserService')
+    
+    // Get application paths
+    const appRoot = this.app.appRoot
+    const publicPath = this.app.publicPath()
+  }
+}
+```
+
+## Using Codemods
+
+The `createCodemods()` method provides access to code generation utilities:
+
+```typescript
+export default class MakeModel extends BaseCommand {
+  static commandName = 'make:model'
+  
+  @args.string()
+  declare name: string
+  
+  async run() {
+    const codemods = await this.createCodemods()
+    
+    // Generate file from stub
+    await codemods.makeUsingStub(stubsRoot, 'model.stub', {
+      entity: this.app.generators.createEntity(this.name)
+    })
+    
+    // Update RC file
+    await codemods.updateRcFile((rcFile) => {
+      rcFile.addProvider('#providers/model_provider')
+    })
+  }
+}
+```
+
+## Command Options
+
+You can configure command behavior using the `options` property:
+
+### Allow Unknown Flags
+
+Allow passing flags that aren't defined in your command:
+
+```typescript
+export default class Test extends BaseCommand {
+  static commandName = 'test'
+  
+  static options = {
+    allowUnknownFlags: true
+  }
+  
+  async run() {
+    // Unknown flags are available in this.parsed.unknownFlags
+  }
+}
+```
+
+### Stays Alive
+
+Indicate that your command will keep the process alive:
+
+```typescript
+export default class Serve extends BaseCommand {
+  static commandName = 'serve'
+  
+  static options = {
+    staysAlive: true
+  }
+  
+  async run() {
+    // Start long-running server
+  }
+}
+```
+
+### Start App
+
+Automatically boot the application before running the command:
+
+```typescript
+export default class MyCommand extends BaseCommand {
+  static commandName = 'my:command'
+  
+  static options = {
+    startApp: true
+  }
+  
+  async run() {
+    // Application is fully booted
+  }
+}
+```
+
+## Running Other Commands
+
+You can execute other commands from within your command:
+
+```typescript
+export default class Setup extends BaseCommand {
+  static commandName = 'setup'
+  
+  async run() {
+    // Run migration
+    await this.kernel.exec('migrate', [])
+    
+    // Run seeder
+    await this.kernel.exec('db:seed', [])
+    
+    this.logger.success('Setup complete!')
+  }
+}
+```
+
+## Terminating the Application
+
+Use the `terminate()` method to gracefully shut down the application:
+
+```typescript
+export default class Serve extends BaseCommand {
+  static commandName = 'serve'
+  static options = { staysAlive: true }
+  
+  async run() {
+    // Start server
+    server.on('close', async () => {
+      await this.terminate()
+    })
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use descriptive command names">
+    Command names should clearly indicate what the command does. Use namespaces (like `make:`, `db:`, `cache:`) to group related commands.
+    
+    ```typescript
+    // Good
+    static commandName = 'cache:clear'
+    static commandName = 'db:seed'
+    
+    // Avoid
+    static commandName = 'clear'
+    static commandName = 'seed'
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate user input">
+    Always validate arguments and flags, especially when prompting users:
+    
+    ```typescript
+    async interact() {
+      if (!this.email) {
+        this.email = await this.prompt.ask('Enter email', {
+          validate(value) {
+            return value.includes('@') ? true : 'Invalid email'
+          }
+        })
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Provide helpful error messages">
+    When commands fail, provide clear, actionable error messages:
+    
+    ```typescript
+    async run() {
+      if (!fileExists) {
+        this.logger.error('Configuration file not found at config/app.ts')
+        this.logger.info('Run: node ace configure <package>')
+        this.exitCode = 1
+        return
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use lifecycle hooks appropriately">
+    - `prepare()` for setting up state
+    - `interact()` for user prompts
+    - `run()` for main logic
+    - `completed()` for cleanup and error handling
+  </Accordion>
+</AccordionGroup>

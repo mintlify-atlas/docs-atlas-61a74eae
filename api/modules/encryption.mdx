@@ -1,0 +1,530 @@
+---
+title: Encryption
+description: Encryption and decryption API with multiple algorithm support
+---
+
+The Encryption module provides encryption and decryption functionality with support for multiple algorithms including ChaCha20-Poly1305, AES-256-GCM, AES-256-CBC, and AES-SIV.
+
+## Import
+
+```typescript
+import { Encryption, EncryptionManager, Hmac, BaseDriver } from '@adonisjs/core/encryption'
+import { defineConfig, drivers, errors } from '@adonisjs/core/encryption'
+import type { EncryptionConfig } from '@adonisjs/core/types/encryption'
+```
+
+## Overview
+
+The Encryption module provides classes and utilities for encrypting and decrypting sensitive data. It supports purpose binding, multiple encryption keys, and various encryption algorithms.
+
+## Classes
+
+### Encryption
+
+Main encryption class for encrypting and decrypting values.
+
+#### Constructor
+
+<ParamField path="config" type="object" required>
+  Configuration object
+  
+  <ParamField path="key" type="string" required>
+    The encryption key
+  </ParamField>
+</ParamField>
+
+#### Methods
+
+##### encrypt
+
+Encrypts a string or object value.
+
+<ParamField path="value" type="string | object" required>
+  The value to encrypt
+</ParamField>
+
+<ParamField path="purpose" type="string">
+  Optional purpose for binding the encrypted value to a specific use case
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The encrypted string
+</ResponseField>
+
+```typescript
+const encryption = new Encryption({ key: 'secret-key' })
+const encrypted = encryption.encrypt('sensitive data')
+const encryptedWithPurpose = encryption.encrypt('api-key', 'api-authentication')
+```
+
+##### decrypt
+
+Decrypts an encrypted value.
+
+<ParamField path="payload" type="string" required>
+  The encrypted string to decrypt
+</ParamField>
+
+<ParamField path="purpose" type="string">
+  Optional purpose that must match the purpose used during encryption
+</ParamField>
+
+<ResponseField name="return" type="string | object">
+  The decrypted value
+</ResponseField>
+
+```typescript
+const decrypted = encryption.decrypt(encrypted)
+const decryptedWithPurpose = encryption.decrypt(encryptedWithPurpose, 'api-authentication')
+```
+
+### EncryptionManager
+
+Manager class for handling multiple encryption instances.
+
+#### Constructor
+
+<ParamField path="config" type="object" required>
+  Configuration object
+  
+  <ParamField path="default" type="string" required>
+    The default encryptor name
+  </ParamField>
+  
+  <ParamField path="list" type="object" required>
+    Map of encryptor configurations
+  </ParamField>
+</ParamField>
+
+#### Methods
+
+##### use
+
+Returns a specific encryption instance.
+
+<ParamField path="name" type="string">
+  Optional encryptor name. If omitted, returns the default encryptor.
+</ParamField>
+
+<ResponseField name="return" type="Encryption">
+  The encryption instance
+</ResponseField>
+
+```typescript
+const manager = new EncryptionManager({
+  default: 'app',
+  list: {
+    app: {
+      driver: (key) => new AES256GCM({ key }),
+      keys: ['app-key']
+    }
+  }
+})
+
+const encryptor = manager.use('app')
+const encrypted = encryptor.encrypt('data')
+```
+
+### Hmac
+
+HMAC (Hash-based Message Authentication Code) class for creating and verifying message authentication codes.
+
+#### Constructor
+
+<ParamField path="key" type="string" required>
+  The secret key for HMAC generation
+</ParamField>
+
+#### Methods
+
+##### generate
+
+Generates an HMAC signature for a message.
+
+<ParamField path="message" type="string" required>
+  The message to sign
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The HMAC signature
+</ResponseField>
+
+```typescript
+const hmac = new Hmac('secret-key')
+const signature = hmac.generate('message')
+```
+
+##### verify
+
+Verifies an HMAC signature.
+
+<ParamField path="message" type="string" required>
+  The original message
+</ParamField>
+
+<ParamField path="signature" type="string" required>
+  The signature to verify
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if the signature is valid
+</ResponseField>
+
+```typescript
+const isValid = hmac.verify('message', signature)
+```
+
+### BaseDriver
+
+Base class for implementing custom encryption drivers.
+
+<Info>
+Extend this class to create custom encryption implementations that can be used with the EncryptionManager.
+</Info>
+
+```typescript
+class CustomDriver extends BaseDriver {
+  encrypt(value: string) {
+    // Custom encryption logic
+  }
+  
+  decrypt(payload: string) {
+    // Custom decryption logic
+  }
+}
+```
+
+## Functions
+
+### defineConfig
+
+Defines the encryption configuration for the application.
+
+<ParamField path="config" type="object" required>
+  The encryption configuration object
+  
+  <ParamField path="default" type="string">
+    Optional default encryptor name
+  </ParamField>
+  
+  <ParamField path="list" type="object" required>
+    Map of encryptor names to their configurations or providers
+  </ParamField>
+</ParamField>
+
+<ResponseField name="return" type="ConfigProvider<ResolvedConfig>">
+  A configuration provider that lazily resolves encryption drivers
+</ResponseField>
+
+```typescript
+import { defineConfig, drivers } from '@adonisjs/core/encryption'
+import env from '@adonisjs/core/services/env'
+
+const encryptionConfig = defineConfig({
+  default: 'app',
+  list: {
+    app: drivers.aes256gcm({
+      id: 'app',
+      keys: [env.get('APP_KEY')]
+    }),
+    backup: drivers.chacha20({
+      id: 'backup',
+      keys: [env.get('BACKUP_KEY')]
+    })
+  }
+})
+```
+
+## Drivers
+
+The `drivers` object provides factory functions for creating encryption driver configurations.
+
+### drivers.chacha20
+
+Creates a ChaCha20-Poly1305 encryption driver configuration.
+
+<Info>
+ChaCha20-Poly1305 is a modern authenticated encryption algorithm that provides excellent performance on systems without AES hardware acceleration.
+</Info>
+
+<ParamField path="config" type="ChaCha20Poly1305DriverConfig" required>
+  <ParamField path="id" type="string" required>
+    Unique identifier for this encryptor
+  </ParamField>
+  
+  <ParamField path="keys" type="string[]" required>
+    Array of encryption keys (supports key rotation)
+  </ParamField>
+</ParamField>
+
+```typescript
+chacha20: drivers.chacha20({
+  id: 'app',
+  keys: [env.get('APP_KEY')]
+})
+```
+
+### drivers.aes256cbc
+
+Creates an AES-256-CBC encryption driver configuration.
+
+<Warning>
+AES-256-CBC is widely supported but consider using AES-256-GCM for new applications as it provides authenticated encryption.
+</Warning>
+
+<ParamField path="config" type="AES256CBCDriverConfig" required>
+  <ParamField path="id" type="string" required>
+    Unique identifier for this encryptor
+  </ParamField>
+  
+  <ParamField path="keys" type="string[]" required>
+    Array of encryption keys
+  </ParamField>
+</ParamField>
+
+```typescript
+aes256cbc: drivers.aes256cbc({
+  id: 'legacy',
+  keys: [env.get('LEGACY_KEY')]
+})
+```
+
+### drivers.aes256gcm
+
+Creates an AES-256-GCM encryption driver configuration.
+
+<Info>
+AES-256-GCM is an authenticated encryption algorithm that provides both confidentiality and integrity. It offers excellent performance on systems with AES hardware acceleration.
+</Info>
+
+<ParamField path="config" type="AES256GCMDriverConfig" required>
+  <ParamField path="id" type="string" required>
+    Unique identifier for this encryptor
+  </ParamField>
+  
+  <ParamField path="keys" type="string[]" required>
+    Array of encryption keys
+  </ParamField>
+</ParamField>
+
+```typescript
+aes256gcm: drivers.aes256gcm({
+  id: 'app',
+  keys: [env.get('APP_KEY')]
+})
+```
+
+### drivers.aessiv
+
+Creates an AES-SIV encryption driver configuration.
+
+<ParamField path="config" type="AESSIVDriverConfig" required>
+  <ParamField path="id" type="string" required>
+    Unique identifier for this encryptor
+  </ParamField>
+  
+  <ParamField path="key" type="string" required>
+    Single encryption key
+  </ParamField>
+</ParamField>
+
+```typescript
+aessiv: drivers.aessiv({
+  id: 'app',
+  key: env.get('APP_KEY')
+})
+```
+
+### drivers.legacy
+
+Creates a Legacy encryption driver configuration for compatibility with AdonisJS v6.
+
+<Info>
+The Legacy driver maintains compatibility with the old AdonisJS v6 encryption format using AES-256-CBC with HMAC SHA-256. Use this when migrating from older versions.
+</Info>
+
+<ParamField path="config" type="LegacyDriverConfig" required>
+  <ParamField path="keys" type="string[]" required>
+    Array of encryption keys
+  </ParamField>
+</ParamField>
+
+```typescript
+legacy: drivers.legacy({
+  keys: [env.get('APP_KEY')]
+})
+```
+
+## Errors
+
+The `errors` object contains encryption-specific exceptions.
+
+### E_BLIND_INDEX_NOT_SUPPORTED
+
+Raised when attempting to compute blind indexes using the legacy driver.
+
+```typescript
+import { errors } from '@adonisjs/core/encryption'
+
+try {
+  // Some operation
+} catch (error) {
+  if (error instanceof errors.E_BLIND_INDEX_NOT_SUPPORTED) {
+    console.error('Blind indexes not supported')
+  }
+}
+```
+
+## Example Usage
+
+### Configuration
+
+```typescript
+// config/encryption.ts
+import { defineConfig, drivers } from '@adonisjs/core/encryption'
+import env from '@adonisjs/core/services/env'
+
+export default defineConfig({
+  default: 'app',
+  
+  list: {
+    app: drivers.aes256gcm({
+      id: 'app',
+      keys: [env.get('APP_KEY')]
+    }),
+    
+    api: drivers.chacha20({
+      id: 'api',
+      keys: [env.get('API_KEY')]
+    }),
+    
+    legacy: drivers.legacy({
+      keys: [env.get('OLD_APP_KEY')]
+    })
+  }
+})
+```
+
+### Basic Usage
+
+```typescript
+import encryption from '@adonisjs/core/services/encryption'
+
+// Encrypt data
+const encrypted = encryption.encrypt('sensitive data')
+
+// Decrypt data
+const decrypted = encryption.decrypt(encrypted)
+
+// Encrypt with purpose binding
+const apiToken = encryption.encrypt('api-token-value', 'api-authentication')
+const decryptedToken = encryption.decrypt(apiToken, 'api-authentication')
+
+// Use specific encryptor
+const apiEncryption = encryption.use('api')
+const encryptedData = apiEncryption.encrypt('data')
+```
+
+### Encrypting User Data
+
+```typescript
+import encryption from '@adonisjs/core/services/encryption'
+import User from '#models/user'
+
+class UserController {
+  async store({ request, response }: HttpContext) {
+    const data = request.only(['name', 'email', 'ssn'])
+    
+    // Encrypt sensitive data
+    const encryptedSSN = encryption.encrypt(data.ssn, 'user-ssn')
+    
+    const user = await User.create({
+      name: data.name,
+      email: data.email,
+      ssn: encryptedSSN
+    })
+    
+    return response.json(user)
+  }
+  
+  async show({ params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+    
+    // Decrypt sensitive data
+    const decryptedSSN = encryption.decrypt(user.ssn, 'user-ssn')
+    
+    return response.json({
+      ...user.toJSON(),
+      ssn: decryptedSSN
+    })
+  }
+}
+```
+
+### HMAC Signatures
+
+```typescript
+import { Hmac } from '@adonisjs/core/encryption'
+import env from '@adonisjs/core/services/env'
+
+const hmac = new Hmac(env.get('HMAC_KEY'))
+
+// Generate signature
+const message = 'Important message'
+const signature = hmac.generate(message)
+
+// Verify signature
+const isValid = hmac.verify(message, signature)
+if (isValid) {
+  console.log('Signature is valid')
+}
+
+// Use case: Sign API requests
+class ApiClient {
+  private hmac = new Hmac(env.get('API_SECRET'))
+  
+  async makeRequest(endpoint: string, data: any) {
+    const payload = JSON.stringify(data)
+    const signature = this.hmac.generate(payload)
+    
+    return fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'X-Signature': signature,
+        'Content-Type': 'application/json'
+      },
+      body: payload
+    })
+  }
+}
+```
+
+### Key Rotation
+
+```typescript
+// config/encryption.ts
+export default defineConfig({
+  default: 'app',
+  list: {
+    app: drivers.aes256gcm({
+      id: 'app',
+      keys: [
+        env.get('NEW_APP_KEY'),  // New key (first = used for encryption)
+        env.get('OLD_APP_KEY')   // Old key (still able to decrypt)
+      ]
+    })
+  }
+})
+
+// The first key is used for encryption
+// All keys are tried for decryption (supports seamless key rotation)
+```
+
+## Notes
+
+- Always use environment variables for encryption keys
+- Purpose binding adds an extra layer of security by binding encrypted data to a specific use case
+- Key rotation is supported by providing multiple keys (first key encrypts, all keys can decrypt)
+- AES-256-GCM is recommended for new applications
+- Use the Legacy driver only when migrating from AdonisJS v6
+- Encrypted values are URL-safe base64 encoded strings

@@ -1,0 +1,416 @@
+---
+title: Creating Custom Providers
+description: Learn how to create custom service providers to register and boot services in AdonisJS applications
+---
+
+Service providers are the foundation of AdonisJS application bootstrapping. They allow you to register bindings, configure services, and perform initialization logic in a structured lifecycle.
+
+## Overview
+
+Service providers in AdonisJS follow a three-phase lifecycle:
+
+1. **Register** - Register bindings with the IoC container
+2. **Boot** - Perform initialization after all providers are registered
+3. **Ready** - Execute logic when the application is ready
+
+Each phase is optional, and you only need to implement the methods required for your provider.
+
+## Basic Provider Structure
+
+Create a service provider by defining a class with lifecycle methods:
+
+```ts
+import type { ApplicationService } from '@adonisjs/core/types'
+
+export default class MyServiceProvider {
+  constructor(protected app: ApplicationService) {}
+  
+  register() {
+    // Register container bindings
+  }
+  
+  async boot() {
+    // Initialize services after registration
+  }
+  
+  async ready() {
+    // Execute when application is ready
+  }
+}
+```
+
+## Real-World Example: Hash Provider
+
+Let's examine the built-in `HashServiceProvider` as a reference:
+
+```ts
+import { RuntimeException } from '@poppinss/utils/exception'
+import { Hash } from '../modules/hash/main.ts'
+import { configProvider } from '../src/config_provider.ts'
+import type { ApplicationService } from '../src/types.ts'
+
+export default class HashServiceProvider {
+  constructor(protected app: ApplicationService) {}
+  
+  /**
+   * Register the hash manager with configuration
+   */
+  protected registerHashManager() {
+    this.app.container.singleton('hash', async () => {
+      const hashConfigProvider = this.app.config.get('hash')
+      const config = await configProvider.resolve<any>(this.app, hashConfigProvider)
+      
+      if (!config) {
+        throw new RuntimeException(
+          'Invalid "config/hash.ts" file. Make sure you are using the "defineConfig" method'
+        )
+      }
+      
+      const { HashManager } = await import('../modules/hash/main.js')
+      return new HashManager(config)
+    })
+  }
+  
+  /**
+   * Register the Hash class to resolve the default hasher
+   */
+  protected registerHash() {
+    this.app.container.singleton(Hash, async (resolver) => {
+      const hashManager = await resolver.make('hash')
+      return hashManager.use()
+    })
+  }
+  
+  register() {
+    this.registerHashManager()
+    this.registerHash()
+  }
+}
+```
+
+## The Register Phase
+
+The `register` method is called during application bootstrap. Use it to:
+
+- Bind services to the IoC container
+- Register singletons
+- Create container aliases
+
+<Warning>
+Do NOT resolve services from the container during registration. Other providers may not have registered their bindings yet.
+</Warning>
+
+### Singleton Bindings
+
+Register services that should be instantiated once:
+
+```ts
+register() {
+  this.app.container.singleton('mailer', async () => {
+    const { MailManager } = await import('./mail_manager.js')
+    const config = this.app.config.get('mail')
+    return new MailManager(config)
+  })
+}
+```
+
+### Class Bindings
+
+Bind classes directly to the container:
+
+```ts
+import { Mailer } from './mailer.ts'
+
+register() {
+  this.app.container.singleton(Mailer, async (resolver) => {
+    const mailManager = await resolver.make('mailer')
+    return mailManager.use()
+  })
+}
+```
+
+### Aliases
+
+Create convenient aliases for bindings:
+
+```ts
+register() {
+  this.app.container.singleton(Logger, () => new Logger())
+  this.app.container.alias('logger', Logger)
+}
+
+// Now accessible via both:
+// await container.make(Logger)
+// await container.make('logger')
+```
+
+## The Boot Phase
+
+The `boot` method runs after all providers have registered their bindings. Use it for:
+
+- Resolving dependencies from the container
+- Configuring services
+- Setting up event listeners
+
+```ts
+async boot() {
+  const emitter = await this.app.container.make('emitter')
+  const logger = await this.app.container.make('logger')
+  
+  // Configure services with dependencies
+  emitter.on('error', (error) => {
+    logger.error(error.message)
+  })
+}
+```
+
+### Example: App Provider Boot
+
+The core `AppServiceProvider` configures the event emitter:
+
+```ts
+import { BaseEvent } from '../modules/events.ts'
+
+async boot() {
+  const emitter = await this.app.container.make('emitter')
+  BaseEvent.useEmitter(emitter)
+}
+```
+
+## The Ready Phase
+
+The `ready` method executes when the application is fully initialized. Use it for:
+
+- Starting background services
+- Generating metadata files
+- Performing health checks
+
+```ts
+async ready() {
+  if (!this.app.inProduction) {
+    // Development-only tasks
+    await this.generateTypes()
+  }
+}
+```
+
+### Example: Route Type Generation
+
+The `AppServiceProvider` generates route types in development:
+
+```ts
+async ready() {
+  if (!this.app.inProduction) {
+    const router = await this.app.container.make('router')
+    if (router.commited) {
+      await this.emitRoutes(router)
+    }
+  }
+}
+
+protected async emitRoutes(router: Router) {
+  const { routes, imports, types } = router.generateTypes(2)
+  const routesTypesPath = this.app.generatedServerPath('routes.d.ts')
+  
+  await mkdir(dirname(routesTypesPath), { recursive: true })
+  await writeFile(routesTypesPath, [
+    `import '@adonisjs/core/types/http'`,
+    ...imports,
+    '',
+    ...types
+  ].join('\n'))
+}
+```
+
+## Lazy Loading Modules
+
+Import heavy dependencies lazily to improve boot time:
+
+```ts
+register() {
+  this.app.container.singleton('mail', async () => {
+    // Only imported when 'mail' is resolved
+    const { MailManager } = await import('./mail_manager.js')
+    return new MailManager()
+  })
+}
+```
+
+## Configuration Resolution
+
+Use the `configProvider` utility to resolve configuration:
+
+```ts
+import { configProvider } from '@adonisjs/core'
+
+register() {
+  this.app.container.singleton('encryption', async () => {
+    const encryptionConfigProvider = this.app.config.get('encryption')
+    const config = await configProvider.resolve<any>(this.app, encryptionConfigProvider)
+    
+    if (!config) {
+      throw new RuntimeException('Invalid encryption config')
+    }
+    
+    const { EncryptionManager } = await import('./encryption.js')
+    return new EncryptionManager(config)
+  })
+}
+```
+
+## Registering Providers
+
+Add your provider to `adonisrc.ts`:
+
+```ts
+import { defineConfig } from '@adonisjs/core/app'
+
+export default defineConfig({
+  providers: [
+    () => import('@adonisjs/core/providers/app_provider'),
+    () => import('@adonisjs/core/providers/hash_provider'),
+    () => import('./providers/my_service_provider.js') // Your provider
+  ]
+})
+```
+
+### Environment-Specific Providers
+
+Load providers conditionally based on environment:
+
+```ts
+export default defineConfig({
+  providers: [
+    () => import('@adonisjs/core/providers/app_provider'),
+    () => import('./providers/my_service_provider.js'),
+    {
+      file: () => import('@adonisjs/lucid/database_provider'),
+      environment: ['web', 'console', 'test']
+    },
+    {
+      file: () => import('./providers/dev_tools_provider.js'),
+      environment: ['web']
+    }
+  ]
+})
+```
+
+## Complete Example
+
+Here's a complete custom provider for a notification service:
+
+```ts
+import type { ApplicationService } from '@adonisjs/core/types'
+
+export default class NotificationServiceProvider {
+  constructor(protected app: ApplicationService) {}
+  
+  /**
+   * Register notification manager
+   */
+  protected registerNotificationManager() {
+    this.app.container.singleton('notifications', async () => {
+      const { NotificationManager } = await import('./notification_manager.js')
+      const config = this.app.config.get('notifications')
+      return new NotificationManager(config)
+    })
+  }
+  
+  /**
+   * Register default notification channel
+   */
+  protected registerNotification() {
+    this.app.container.singleton('notification', async (resolver) => {
+      const manager = await resolver.make('notifications')
+      return manager.use() // Use default channel
+    })
+  }
+  
+  /**
+   * Register bindings during application bootstrap
+   */
+  register() {
+    this.registerNotificationManager()
+    this.registerNotification()
+  }
+  
+  /**
+   * Configure services after all providers are registered
+   */
+  async boot() {
+    const emitter = await this.app.container.make('emitter')
+    const notifications = await this.app.container.make('notifications')
+    
+    // Listen to events and send notifications
+    emitter.on('user:registered', async (user) => {
+      await notifications.use('email').send('welcome', { user })
+    })
+  }
+  
+  /**
+   * Perform health check when application is ready
+   */
+  async ready() {
+    const notifications = await this.app.container.make('notifications')
+    
+    if (this.app.inProduction) {
+      await notifications.healthCheck()
+    }
+  }
+}
+```
+
+## Best Practices
+
+<Tip>
+Organize complex registration logic into separate protected methods. This improves readability and makes testing easier.
+</Tip>
+
+<Note>
+Always use async imports (`await import()`) for lazy loading. This keeps your application boot time fast.
+</Note>
+
+<Warning>
+Never resolve services from the container in the `register` method. Wait until `boot` or `ready` to resolve dependencies.
+</Warning>
+
+### Error Handling
+
+Validate configuration and throw meaningful errors:
+
+```ts
+register() {
+  this.app.container.singleton('mail', async () => {
+    const config = this.app.config.get('mail')
+    
+    if (!config) {
+      throw new RuntimeException(
+        'Missing mail configuration. Create config/mail.ts file.'
+      )
+    }
+    
+    const { MailManager } = await import('./mail.js')
+    return new MailManager(config)
+  })
+}
+```
+
+### Type Safety
+
+Extend container types for better IDE support:
+
+```ts
+// types/container.ts
+declare module '@adonisjs/core/types' {
+  interface ContainerBindings {
+    mail: MailManager
+    notification: Notification
+  }
+}
+```
+
+Now TypeScript knows about your bindings:
+
+```ts
+const mail = await container.make('mail') // Type: MailManager
+```

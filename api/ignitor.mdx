@@ -1,0 +1,263 @@
+---
+title: Ignitor
+description: API reference for the Ignitor class used to bootstrap and manage AdonisJS applications in different environments
+---
+
+The `Ignitor` class is the main entry point for creating and managing AdonisJS application processes. It is used to instantiate an AdonisJS application in different known environments such as web servers, console commands, and test runners.
+
+## Import
+
+```typescript
+import { Ignitor } from '@adonisjs/core'
+```
+
+## Constructor
+
+Creates a new Ignitor instance.
+
+```typescript
+const ignitor = new Ignitor(appRoot, options)
+```
+
+<ParamField path="appRoot" type="URL" required>
+  The root URL of the application. Typically created using `new URL(import.meta.url)`.
+</ParamField>
+
+<ParamField path="options" type="IgnitorOptions">
+  Configuration options for the ignitor.
+  
+  <Expandable title="properties">
+    <ParamField path="importer" type="Importer">
+      Optional custom importer function for loading modules. Useful for customizing module resolution behavior.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Methods
+
+### createApp
+
+Creates an instance of the AdonisJS application for a specific environment.
+
+```typescript
+const app = ignitor.createApp(environment)
+```
+
+<ParamField path="environment" type="AppEnvironments" required>
+  The environment in which to create the app. Valid values are:
+  - `'web'` - For HTTP server processes
+  - `'console'` - For Ace CLI commands
+  - `'test'` - For test runner processes
+  - `'repl'` - For REPL sessions
+</ParamField>
+
+<ResponseField name="return" type="ApplicationService">
+  Returns an instance of the Application class with all container bindings registered.
+</ResponseField>
+
+### getApp
+
+Retrieve the application instance created by the ignitor.
+
+```typescript
+const app = ignitor.getApp()
+```
+
+<ResponseField name="return" type="ApplicationService | undefined">
+  Returns the application instance if it has been created, otherwise `undefined`.
+</ResponseField>
+
+### tap
+
+Register a callback to access the application instance immediately after it is created.
+
+```typescript
+ignitor.tap((app) => {
+  // Configure or customize the app
+})
+```
+
+<ParamField path="callback" type="(app: ApplicationService) => void" required>
+  Callback function that receives the application instance. Can be synchronous or asynchronous.
+</ParamField>
+
+<ResponseField name="return" type="this">
+  Returns the Ignitor instance for method chaining.
+</ResponseField>
+
+### httpServer
+
+Get an instance of the HTTP server process for running web applications.
+
+```typescript
+const httpProcess = ignitor.httpServer()
+```
+
+<ResponseField name="return" type="HttpServerProcess">
+  Returns a new `HttpServerProcess` instance that can be used to start the HTTP server.
+</ResponseField>
+
+### ace
+
+Get an instance of the Ace process for running CLI commands.
+
+```typescript
+const aceProcess = ignitor.ace()
+```
+
+<ResponseField name="return" type="AceProcess">
+  Returns a new `AceProcess` instance that can be used to handle command line arguments.
+</ResponseField>
+
+### testRunner
+
+Get an instance of the test runner process for running tests.
+
+```typescript
+const testProcess = ignitor.testRunner()
+```
+
+<ResponseField name="return" type="TestRunnerProcess">
+  Returns a new `TestRunnerProcess` instance that can be used to run test suites.
+</ResponseField>
+
+### terminate
+
+Terminates the application by calling the `app.terminate()` method.
+
+```typescript
+await ignitor.terminate()
+```
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when the application has been terminated.
+</ResponseField>
+
+## Usage Examples
+
+### Starting an HTTP Server
+
+```typescript
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL(import.meta.url))
+
+await ignitor.httpServer().start()
+```
+
+### Running CLI Commands
+
+```typescript
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL(import.meta.url))
+
+await ignitor.ace().handle(process.argv.slice(2))
+```
+
+### Running Tests
+
+```typescript
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL(import.meta.url))
+
+await ignitor.testRunner().run(async (app) => {
+  // Your test code here
+})
+```
+
+### Using tap for Configuration
+
+```typescript
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL(import.meta.url))
+
+ignitor.tap((app) => {
+  // Configure the app before it starts
+  console.log('App created in', app.environment, 'environment')
+})
+
+await ignitor.httpServer().start()
+```
+
+## Process Classes
+
+### HttpServerProcess
+
+The HTTP server process manages the Node.js HTTP server lifecycle.
+
+#### start
+
+Starts the HTTP server and wires up the application.
+
+```typescript
+await httpProcess.start(serverCallback?)
+```
+
+<ParamField path="serverCallback" type="(handler: RequestHandler) => Server">
+  Optional callback to create a custom HTTP server instance. Useful for HTTPS or custom server configurations.
+</ParamField>
+
+### AceProcess
+
+The Ace process manages CLI command execution.
+
+#### configure
+
+Register a callback to configure the Ace kernel before handling commands.
+
+```typescript
+aceProcess.configure((app) => {
+  // Configure ace kernel
+})
+```
+
+<ParamField path="callback" type="(app: ApplicationService) => void | Promise<void>" required>
+  Configuration callback function.
+</ParamField>
+
+#### handle
+
+Handles command line arguments and executes matching Ace commands.
+
+```typescript
+await aceProcess.handle(argv)
+```
+
+<ParamField path="argv" type="string[]" required>
+  Command line arguments array, typically `process.argv.slice(2)`.
+</ParamField>
+
+### TestRunnerProcess
+
+The test runner process manages the test environment lifecycle.
+
+#### configure
+
+Register a callback that runs after booting the app and before the provider's ready hook.
+
+```typescript
+testProcess.configure((app) => {
+  // Configure test environment
+})
+```
+
+<ParamField path="callback" type="(app: ApplicationService) => void | Promise<void>" required>
+  Configuration callback function.
+</ParamField>
+
+#### run
+
+Runs a callback after starting the app.
+
+```typescript
+await testProcess.run(async (app) => {
+  // Run your tests
+})
+```
+
+<ParamField path="callback" type="(app: ApplicationService) => void | Promise<void>" required>
+  Test execution callback function.
+</ParamField>

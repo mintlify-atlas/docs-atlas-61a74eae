@@ -1,0 +1,389 @@
+---
+title: 'Router'
+description: 'Router API reference for defining and managing HTTP routes in AdonisJS'
+---
+
+The `Router` class provides a fluent API for defining HTTP routes in your AdonisJS application. It supports various HTTP methods, route groups, resource routes, and middleware.
+
+## Importing
+
+```typescript
+import router from '#services/router'
+import { Router } from '@adonisjs/core/http'
+```
+
+## Properties
+
+<ParamField path="routes" type="Route[]">
+  Collection of all registered routes
+</ParamField>
+
+<ParamField path="precompiler" type="RoutePrecompiler">
+  Precompiler instance for optimizing routes
+</ParamField>
+
+## HTTP Methods
+
+### get()
+
+Register a GET route.
+
+```typescript
+router.get('/users', [UsersController, 'index'])
+```
+
+<ParamField path="pattern" type="string">
+  URL pattern for the route
+</ParamField>
+
+<ParamField path="handler" type="RouteHandler">
+  Route handler function or controller reference
+</ParamField>
+
+**Returns:** `Route`
+
+### post()
+
+Register a POST route.
+
+```typescript
+router.post('/users', [UsersController, 'store'])
+```
+
+<ParamField path="pattern" type="string">
+  URL pattern for the route
+</ParamField>
+
+<ParamField path="handler" type="RouteHandler">
+  Route handler function or controller reference
+</ParamField>
+
+**Returns:** `Route`
+
+### put()
+
+Register a PUT route.
+
+```typescript
+router.put('/users/:id', [UsersController, 'update'])
+```
+
+<ParamField path="pattern" type="string">
+  URL pattern for the route
+</ParamField>
+
+<ParamField path="handler" type="RouteHandler">
+  Route handler function or controller reference
+</ParamField>
+
+**Returns:** `Route`
+
+### patch()
+
+Register a PATCH route.
+
+```typescript
+router.patch('/users/:id', [UsersController, 'update'])
+```
+
+<ParamField path="pattern" type="string">
+  URL pattern for the route
+</ParamField>
+
+<ParamField path="handler" type="RouteHandler">
+  Route handler function or controller reference
+</ParamField>
+
+**Returns:** `Route`
+
+### delete()
+
+Register a DELETE route.
+
+```typescript
+router.delete('/users/:id', [UsersController, 'destroy'])
+```
+
+<ParamField path="pattern" type="string">
+  URL pattern for the route
+</ParamField>
+
+<ParamField path="handler" type="RouteHandler">
+  Route handler function or controller reference
+</ParamField>
+
+**Returns:** `Route`
+
+### any()
+
+Register a route that responds to all HTTP methods.
+
+```typescript
+router.any('/webhook', [WebhookController, 'handle'])
+```
+
+<ParamField path="pattern" type="string">
+  URL pattern for the route
+</ParamField>
+
+<ParamField path="handler" type="RouteHandler">
+  Route handler function or controller reference
+</ParamField>
+
+**Returns:** `Route`
+
+## Route Groups
+
+### group()
+
+Group multiple routes together to apply shared configuration.
+
+```typescript
+router.group(() => {
+  router.get('/posts', [PostsController, 'index'])
+  router.post('/posts', [PostsController, 'store'])
+}).prefix('/api/v1').middleware('auth')
+```
+
+<ParamField path="callback" type="() => void">
+  Callback function containing route definitions
+</ParamField>
+
+**Returns:** `RouteGroup`
+
+### prefix()
+
+Add a prefix to all routes in a group.
+
+```typescript
+router.group(() => {
+  // Routes here
+}).prefix('/api/v1')
+```
+
+<ParamField path="prefix" type="string">
+  URL prefix to prepend to all routes
+</ParamField>
+
+**Returns:** `RouteGroup`
+
+### middleware()
+
+Apply middleware to all routes in a group.
+
+```typescript
+router.group(() => {
+  // Protected routes
+}).middleware(['auth', 'verified'])
+```
+
+<ParamField path="middleware" type="string | string[]">
+  Middleware name(s) to apply
+</ParamField>
+
+**Returns:** `RouteGroup`
+
+## Resource Routes
+
+### resource()
+
+Register RESTful resource routes.
+
+```typescript
+router.resource('posts', PostsController)
+```
+
+This creates the following routes:
+- `GET /posts` - index
+- `GET /posts/create` - create
+- `POST /posts` - store
+- `GET /posts/:id` - show
+- `GET /posts/:id/edit` - edit
+- `PUT/PATCH /posts/:id` - update
+- `DELETE /posts/:id` - destroy
+
+<ParamField path="resource" type="string">
+  Resource name
+</ParamField>
+
+<ParamField path="controller" type="Constructor">
+  Controller class handling the resource
+</ParamField>
+
+**Returns:** `ResourceRoute`
+
+### apiOnly()
+
+Create API-only resource routes (excludes create and edit).
+
+```typescript
+router.resource('posts', PostsController).apiOnly()
+```
+
+**Returns:** `ResourceRoute`
+
+### only()
+
+Include only specific resource routes.
+
+```typescript
+router.resource('posts', PostsController).only(['index', 'show'])
+```
+
+<ParamField path="actions" type="string[]">
+  Array of action names to include
+</ParamField>
+
+**Returns:** `ResourceRoute`
+
+### except()
+
+Exclude specific resource routes.
+
+```typescript
+router.resource('posts', PostsController).except(['destroy'])
+```
+
+<ParamField path="actions" type="string[]">
+  Array of action names to exclude
+</ParamField>
+
+**Returns:** `ResourceRoute`
+
+## Route Configuration
+
+### as()
+
+Assign a name to a route for URL generation.
+
+```typescript
+router.get('/dashboard', [DashboardController, 'index'])
+  .as('dashboard')
+```
+
+<ParamField path="name" type="string">
+  Route name
+</ParamField>
+
+**Returns:** `Route`
+
+### where()
+
+Add parameter constraints using regular expressions.
+
+```typescript
+router.get('/posts/:id', [PostsController, 'show'])
+  .where('id', /^[0-9]+$/)
+```
+
+<ParamField path="param" type="string">
+  Parameter name
+</ParamField>
+
+<ParamField path="matcher" type="RegExp | string">
+  Regular expression or string pattern
+</ParamField>
+
+**Returns:** `Route`
+
+### domain()
+
+Restrict a route to a specific domain.
+
+```typescript
+router.get('/', [HomeController, 'index'])
+  .domain('blog.example.com')
+```
+
+<ParamField path="domain" type="string">
+  Domain name or pattern
+</ParamField>
+
+**Returns:** `Route`
+
+## Route Matchers
+
+### matchers()
+
+Define global parameter matchers.
+
+```typescript
+router.matchers({
+  id: /^[0-9]+$/,
+  slug: /^[a-z0-9-]+$/
+})
+```
+
+<ParamField path="matchers" type="Record<string, RegExp>">
+  Object mapping parameter names to regular expressions
+</ParamField>
+
+**Returns:** `this`
+
+## Utilities
+
+### commit()
+
+Finalize and commit all registered routes.
+
+```typescript
+router.commit()
+```
+
+**Returns:** `void`
+
+### toJSON()
+
+Get a JSON representation of all routes.
+
+```typescript
+const routes = router.toJSON()
+```
+
+**Returns:** `RouteJSON[]`
+
+## Example Usage
+
+```typescript
+import router from '#services/router'
+import UsersController from '#controllers/users_controller'
+import PostsController from '#controllers/posts_controller'
+
+// Basic routes
+router.get('/', async ({ view }) => {
+  return view.render('home')
+})
+
+// Controller routes
+router.get('/users', [UsersController, 'index'])
+router.post('/users', [UsersController, 'store'])
+
+// Named routes
+router.get('/dashboard', [DashboardController, 'index'])
+  .as('dashboard')
+
+// Routes with constraints
+router.get('/posts/:id', [PostsController, 'show'])
+  .where('id', /^[0-9]+$/)
+
+// Route groups
+router.group(() => {
+  router.resource('posts', PostsController).apiOnly()
+  router.resource('comments', CommentsController)
+}).prefix('/api').middleware('auth')
+
+// Subdomain routes
+router.group(() => {
+  router.get('/', [BlogController, 'index'])
+}).domain(':tenant.example.com')
+```
+
+## Type Safety
+
+The router provides full TypeScript support with type-safe route definitions:
+
+```typescript
+import type { HttpRouterService } from '@adonisjs/core/types'
+
+const router: HttpRouterService = await app.container.make('router')
+```

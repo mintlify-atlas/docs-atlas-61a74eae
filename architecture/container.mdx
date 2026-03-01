@@ -1,0 +1,599 @@
+---
+title: IoC Container
+description: Learn how to use the AdonisJS IoC container for dependency injection and service management
+---
+
+The IoC (Inversion of Control) container is the heart of AdonisJS's dependency injection system. It manages service instances, resolves dependencies automatically, and promotes loose coupling in your applications.
+
+## What is the IoC Container?
+
+The IoC container is a service registry that:
+- Stores bindings for services and their factories
+- Resolves dependencies automatically through constructor injection
+- Manages singleton and transient lifecycles
+- Enables testability through dependency injection
+
+<Info>
+  The AdonisJS container is powered by [@adonisjs/fold](https://github.com/adonisjs/fold), a standalone dependency injection library.
+</Info>
+
+## Basic Usage
+
+### Accessing the Container
+
+The container is available on the application instance:
+
+```typescript
+import app from '@adonisjs/core/services/app'
+
+// Resolve a service
+const logger = await app.container.make('logger')
+logger.info('Hello from the container')
+```
+
+### Making Instances
+
+Use the `make()` method to resolve services from the container:
+
+```typescript
+// By string key
+const emitter = await app.container.make('emitter')
+
+// By class reference
+import { Logger } from '@adonisjs/core/logger'
+const logger = await app.container.make(Logger)
+```
+
+## Container Bindings
+
+Bindings define how services are created and managed. AdonisJS supports several types of bindings:
+
+### Singleton Bindings
+
+Singletons are created once and reused throughout the application:
+
+```typescript
+import type { ApplicationService } from '@adonisjs/core/types'
+
+export default class MyProvider {
+  constructor(protected app: ApplicationService) {}
+
+  register() {
+    this.app.container.singleton('cache', () => {
+      return new CacheManager({
+        driver: 'redis',
+        connection: {
+          host: '127.0.0.1',
+          port: 6379
+        }
+      })
+    })
+  }
+}
+```
+
+Every call to `app.container.make('cache')` returns the same instance.
+
+### Transient Bindings
+
+Transient bindings create a new instance on each resolution:
+
+```typescript
+register() {
+  this.app.container.bind('notification', () => {
+    return new NotificationService()
+  })
+}
+```
+
+Every call to `app.container.make('notification')` returns a new instance.
+
+### Value Bindings
+
+Bind a direct value without a factory:
+
+```typescript
+register() {
+  this.app.container.bindValue('apiUrl', 'https://api.example.com')
+  this.app.container.bindValue('apiKey', process.env.API_KEY)
+}
+```
+
+### Class Bindings
+
+Bind by class constructor for type-safe resolution:
+
+```typescript
+import { UserService } from '#services/user_service'
+
+register() {
+  this.app.container.singleton(UserService, () => {
+    return new UserService(dependencies)
+  })
+}
+
+// Resolve using class reference
+const userService = await app.container.make(UserService)
+```
+
+### Aliasing
+
+Create multiple ways to access the same binding:
+
+```typescript
+register() {
+  this.app.container.singleton('database', () => {
+    return new DatabaseManager(config)
+  })
+  
+  // Create alias
+  this.app.container.alias('db', 'database')
+  
+  // Both work now:
+  const database = await app.container.make('database')
+  const db = await app.container.make('db')
+  // database === db (same instance)
+}
+```
+
+## Dependency Injection
+
+The container can automatically inject dependencies into class constructors:
+
+### Constructor Injection
+
+Use the `@inject()` decorator to enable automatic dependency resolution:
+
+```typescript
+import { inject } from '@adonisjs/core'
+import type { HttpContext } from '@adonisjs/core/http'
+import UserService from '#services/user_service'
+import MailService from '#services/mail_service'
+
+@inject()
+export default class UsersController {
+  constructor(
+    protected userService: UserService,
+    protected mailService: MailService
+  ) {}
+
+  async store({ request, response }: HttpContext) {
+    const data = request.only(['email', 'password'])
+    const user = await this.userService.create(data)
+    
+    await this.mailService.send('welcome', { user })
+    
+    return response.created(user)
+  }
+}
+```
+
+<Note>
+  The `@inject()` decorator analyzes the constructor parameters and automatically resolves them from the container.
+</Note>
+
+### Manual Injection
+
+Specify exactly what to inject using injection tokens:
+
+```typescript
+import { inject } from '@adonisjs/core'
+
+@inject(['logger', 'cache'])
+export default class MyService {
+  constructor(
+    protected logger: LoggerService,
+    protected cache: CacheService
+  ) {}
+}
+```
+
+### Contextual Binding
+
+Provide different implementations based on the context:
+
+```typescript
+register() {
+  // Default binding
+  this.app.container.singleton('storage', () => {
+    return new LocalStorage()
+  })
+  
+  // Context-specific binding
+  this.app.container.when(MediaController)
+    .provide('storage', () => {
+      return new S3Storage()
+    })
+}
+```
+
+## Resolver
+
+The resolver is passed to binding factories and provides access to the container:
+
+```typescript
+register() {
+  this.app.container.singleton('repository', async (resolver) => {
+    // Resolve dependencies from the container
+    const database = await resolver.make('database')
+    const logger = await resolver.make('logger')
+    
+    return new UserRepository(database, logger)
+  })
+}
+```
+
+## Container Services
+
+AdonisJS registers several core services in the container:
+
+<AccordionGroup>
+  <Accordion title="app - Application Instance">
+    The main application instance:
+    
+    ```typescript
+    const app = await container.make('app')
+    console.log(app.getState())
+    console.log(app.environment)
+    ```
+  </Accordion>
+  
+  <Accordion title="logger - Logger Manager">
+    The logger manager for logging operations:
+    
+    ```typescript
+    const logger = await container.make('logger')
+    logger.info('Application started')
+    logger.error({ err: error }, 'Request failed')
+    ```
+  </Accordion>
+  
+  <Accordion title="config - Configuration">
+    Access to application configuration:
+    
+    ```typescript
+    const config = await container.make('config')
+    const appKey = config.get('app.appKey')
+    ```
+  </Accordion>
+  
+  <Accordion title="emitter - Event Emitter">
+    The event emitter for application events:
+    
+    ```typescript
+    const emitter = await container.make('emitter')
+    emitter.emit('user:created', { userId: 123 })
+    ```
+  </Accordion>
+  
+  <Accordion title="router - HTTP Router">
+    The HTTP router instance:
+    
+    ```typescript
+    const router = await container.make('router')
+    router.get('/users', [UsersController, 'index'])
+    ```
+  </Accordion>
+  
+  <Accordion title="server - HTTP Server">
+    The HTTP server instance:
+    
+    ```typescript
+    const server = await container.make('server')
+    await server.boot()
+    ```
+  </Accordion>
+  
+  <Accordion title="encryption - Encryption Service">
+    Encryption and decryption functionality:
+    
+    ```typescript
+    const encryption = await container.make('encryption')
+    const encrypted = encryption.encrypt('secret data')
+    ```
+  </Accordion>
+  
+  <Accordion title="hash - Hash Manager">
+    Password hashing service:
+    
+    ```typescript
+    const hash = await container.make('hash')
+    const hashed = await hash.make('password')
+    ```
+  </Accordion>
+  
+  <Accordion title="ace - Ace Kernel">
+    The Ace CLI kernel:
+    
+    ```typescript
+    const ace = await container.make('ace')
+    await ace.exec('make:controller', ['UserController'])
+    ```
+  </Accordion>
+  
+  <Accordion title="testUtils - Test Utilities">
+    Utilities for testing:
+    
+    ```typescript
+    const testUtils = await container.make('testUtils')
+    const ctx = testUtils.createHttpContext()
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Type Safety
+
+AdonisJS provides full TypeScript support for container bindings:
+
+### Declaring Bindings
+
+Extend the `ContainerBindings` interface to add type information:
+
+```typescript title="types/container.ts"
+import UserService from '#services/user_service'
+import CacheService from '#services/cache_service'
+
+declare module '@adonisjs/core/types' {
+  interface ContainerBindings {
+    userService: UserService
+    cache: CacheService
+  }
+}
+```
+
+Now the container knows about these types:
+
+```typescript
+// TypeScript knows this returns UserService
+const userService = await app.container.make('userService')
+
+// Type error: 'unknown' is not a valid binding
+const foo = await app.container.make('unknown')
+```
+
+### Type-Safe Resolution
+
+The container provides full IntelliSense and type checking:
+
+```typescript
+// ✅ Type-safe
+const logger = await app.container.make('logger')
+logger.info('Hello') // TypeScript knows logger methods
+
+// ✅ Class-based resolution is also type-safe
+import { Logger } from '@adonisjs/core/logger'
+const logger2 = await app.container.make(Logger)
+```
+
+## Advanced Patterns
+
+### Factory Pattern
+
+Create factories for complex object creation:
+
+```typescript
+register() {
+  this.app.container.singleton('httpClientFactory', () => {
+    return (baseURL: string) => {
+      return new HttpClient({
+        baseURL,
+        timeout: 5000,
+        headers: { 'User-Agent': 'MyApp' }
+      })
+    }
+  })
+}
+
+// Usage
+const factory = await app.container.make('httpClientFactory')
+const githubClient = factory('https://api.github.com')
+const twitterClient = factory('https://api.twitter.com')
+```
+
+### Manager Pattern
+
+Implement the manager pattern for multi-driver services:
+
+```typescript
+import { Manager } from '@adonisjs/core/manager'
+
+export class CacheManager extends Manager<CacheDriver> {
+  protected createRedisDriver() {
+    return new RedisCache(this.config.stores.redis)
+  }
+  
+  protected createMemoryDriver() {
+    return new MemoryCache(this.config.stores.memory)
+  }
+}
+
+register() {
+  this.app.container.singleton('cache', () => {
+    return new CacheManager(config)
+  })
+}
+
+// Usage
+const cache = await app.container.make('cache')
+const redis = cache.use('redis')
+const memory = cache.use('memory')
+```
+
+### Lazy Services
+
+Defer expensive service creation until first access:
+
+```typescript
+register() {
+  this.app.container.singleton('search', async () => {
+    // Heavy import only loaded when needed
+    const { ElasticSearch } = await import('elasticsearch')
+    return new ElasticSearch(config)
+  })
+}
+```
+
+## Container Events
+
+The container emits events when bindings are resolved:
+
+```typescript
+import app from '@adonisjs/core/services/app'
+
+const emitter = await app.container.make('emitter')
+
+emitter.on('container_binding:resolved', ({ binding, value }) => {
+  console.log(`Resolved: ${binding}`)
+  console.log('Instance:', value)
+})
+```
+
+## Swapping Bindings
+
+Replace bindings for testing or different environments:
+
+```typescript
+// Original binding
+register() {
+  this.app.container.singleton('mailer', () => {
+    return new SmtpMailer(config)
+  })
+}
+
+// Swap in tests
+import { test } from '@japa/runner'
+
+test('send email', async ({ assert }) => {
+  const app = createApp()
+  
+  // Replace with mock
+  app.container.swap('mailer', () => {
+    return new MockMailer()
+  })
+  
+  const mailer = await app.container.make('mailer')
+  assert.instanceOf(mailer, MockMailer)
+})
+```
+
+## Hooks
+
+Register hooks that run when bindings are resolved:
+
+```typescript
+register() {
+  this.app.container.singleton('database', () => {
+    return new Database(config)
+  })
+  
+  // Hook runs after resolution
+  this.app.container.resolving('database', (database) => {
+    database.on('query', (sql) => {
+      console.log('SQL:', sql)
+    })
+  })
+}
+```
+
+## Checking Bindings
+
+Check if a binding exists before resolving:
+
+```typescript
+if (app.container.hasBinding('lucid.db')) {
+  const db = await app.container.make('lucid.db')
+  // Use database
+}
+```
+
+## Performance Considerations
+
+<Tip>
+  Best practices for optimal container performance:
+  
+  1. **Use singletons for stateless services** - Services like loggers, routers, and managers
+  2. **Use transient bindings for stateful services** - Services that maintain request-specific state
+  3. **Lazy load heavy dependencies** - Use dynamic imports in factory functions
+  4. **Cache resolved instances** - Store frequently used services in variables
+  5. **Avoid circular dependencies** - Design services to depend on abstractions, not implementations
+</Tip>
+
+## Common Patterns in Practice
+
+### Repository Pattern
+
+```typescript
+import { inject } from '@adonisjs/core'
+import Database from '@adonisjs/lucid/services/db'
+
+@inject()
+export default class UserRepository {
+  constructor(protected db: Database) {}
+  
+  async find(id: number) {
+    return this.db.from('users').where('id', id).first()
+  }
+  
+  async create(data: any) {
+    return this.db.table('users').insert(data)
+  }
+}
+```
+
+### Service Layer
+
+```typescript
+import { inject } from '@adonisjs/core'
+import UserRepository from '#repositories/user_repository'
+import HashService from '#services/hash_service'
+
+@inject()
+export default class AuthService {
+  constructor(
+    protected userRepo: UserRepository,
+    protected hash: HashService
+  ) {}
+  
+  async login(email: string, password: string) {
+    const user = await this.userRepo.findByEmail(email)
+    
+    if (!user || !(await this.hash.verify(user.password, password))) {
+      throw new Error('Invalid credentials')
+    }
+    
+    return user
+  }
+}
+```
+
+### Controller Injection
+
+```typescript
+import { inject } from '@adonisjs/core'
+import type { HttpContext } from '@adonisjs/core/http'
+import AuthService from '#services/auth_service'
+
+@inject()
+export default class AuthController {
+  constructor(protected authService: AuthService) {}
+  
+  async login({ request, response, auth }: HttpContext) {
+    const { email, password } = request.only(['email', 'password'])
+    const user = await this.authService.login(email, password)
+    
+    await auth.use('web').login(user)
+    return response.redirect('/dashboard')
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Service Providers" icon="plug" href="./service-providers">
+    Learn how to register services with the container
+  </Card>
+  <Card title="Application Lifecycle" icon="refresh" href="./application-lifecycle">
+    Understand when services are created and resolved
+  </Card>
+</CardGroup>

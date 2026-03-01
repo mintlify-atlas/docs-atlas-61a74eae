@@ -1,0 +1,97 @@
+---
+title: HTTP Module Overview
+description: Learn about the HTTP module in AdonisJS Core, which provides routing, request/response handling, middleware, and validation capabilities
+---
+
+The HTTP module in AdonisJS Core provides a comprehensive set of tools for building web applications and APIs. It's built on top of the `@adonisjs/http-server` package and includes additional features specifically designed for AdonisJS applications.
+
+## What's included
+
+The HTTP module provides the following core features:
+
+- **Routing**: Define routes with support for HTTP methods, parameters, middleware, and route groups
+- **Controllers**: Organize your application logic into controller classes
+- **Middleware**: Process requests before they reach your route handlers
+- **Request handling**: Access and validate incoming request data
+- **Response handling**: Send responses in various formats (JSON, HTML, files, etc.)
+- **Request validation**: Validate request data using VineJS validators
+- **URL builder**: Generate URLs for your named routes
+
+## Basic usage
+
+Here's a simple example of defining routes and handling requests:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+// Simple route with closure
+router.get('/hello', () => {
+  return { message: 'Hello World' }
+})
+
+// Route with parameters
+router.get('/users/:id', ({ params }) => {
+  return { user: { id: params.id } }
+})
+
+// Route using a controller
+router.post('/users', '#controllers/users_controller.store')
+```
+
+## HttpContext
+
+Every route handler receives an `HttpContext` object, which bundles together the request, response, and other useful properties:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+router.get('/profile', ({ request, response, auth, session }: HttpContext) => {
+  // Access request data
+  const user = await auth.user
+  
+  // Send response
+  return response.json({ user })
+})
+```
+
+The `HttpContext` object includes:
+
+- `request`: The Request object for accessing incoming data
+- `response`: The Response object for sending responses
+- `params`: URL parameters from the route
+- `auth`: Authentication helpers (when auth is configured)
+- `session`: Session management (when session is configured)
+- And more...
+
+## Project structure
+
+HTTP-related files are typically organized as follows:
+
+```
+├── app/
+│   ├── controllers/      # Controller classes
+│   └── middleware/       # Middleware classes
+├── start/
+│   ├── routes.ts        # Route definitions
+│   └── kernel.ts        # Middleware configuration
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Routing" icon="route" href="/http/routing">
+    Learn how to define routes and route groups
+  </Card>
+  
+  <Card title="Controllers" icon="code" href="/http/controllers">
+    Organize logic into controller classes
+  </Card>
+  
+  <Card title="Middleware" icon="filter" href="/http/middleware">
+    Process requests with middleware
+  </Card>
+  
+  <Card title="Validation" icon="check" href="/http/validation">
+    Validate request data with VineJS
+  </Card>
+</CardGroup>

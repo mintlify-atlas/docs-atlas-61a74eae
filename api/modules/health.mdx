@@ -1,0 +1,403 @@
+---
+title: Health
+description: Health check API for monitoring application status
+---
+
+The Health module re-exports all functionality from `@adonisjs/health`, providing health check functionality for monitoring your application's status and dependencies.
+
+## Import
+
+```typescript
+import { HealthChecks } from '@adonisjs/core/health'
+import type { HealthCheckResult, Result } from '@adonisjs/core/health'
+```
+
+## Overview
+
+The Health module provides a framework for implementing health checks in your application. It allows you to monitor the status of various dependencies like databases, caches, queues, and external services.
+
+## Classes
+
+### HealthChecks
+
+The main health checks manager for registering and running health checks.
+
+#### Constructor
+
+The HealthChecks instance is typically created by the framework and available via dependency injection.
+
+#### Methods
+
+##### addChecker
+
+Registers a new health check.
+
+<ParamField path="name" type="string" required>
+  Unique name for the health check
+</ParamField>
+
+<ParamField path="checker" type="function" required>
+  Async function that performs the health check and returns a Result
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value
+</ResponseField>
+
+```typescript
+import { HealthChecks, Result } from '@adonisjs/core/health'
+import db from '@adonisjs/lucid/services/db'
+
+const healthChecks = new HealthChecks()
+
+healthChecks.addChecker('database', async () => {
+  try {
+    await db.rawQuery('SELECT 1')
+    return Result.ok('Database connection is healthy')
+  } catch (error) {
+    return Result.failed('Database connection failed', error)
+  }
+})
+```
+
+##### run
+
+Executes all registered health checks.
+
+<ResponseField name="return" type="Promise<HealthCheckResult>">
+  A promise that resolves to an object containing results of all health checks
+</ResponseField>
+
+```typescript
+import healthChecks from '@adonisjs/core/services/health'
+
+const result = await healthChecks.run()
+console.log(result.isHealthy) // true or false
+console.log(result.report) // Detailed report of all checks
+```
+
+##### runChecker
+
+Runs a specific health check by name.
+
+<ParamField path="name" type="string" required>
+  The name of the health check to run
+</ParamField>
+
+<ResponseField name="return" type="Promise<Result>">
+  A promise that resolves to the result of the specific health check
+</ResponseField>
+
+```typescript
+const result = await healthChecks.runChecker('database')
+if (result.isFailed) {
+  console.error('Database check failed:', result.message)
+}
+```
+
+## Result Class
+
+The Result class represents the outcome of a health check.
+
+### Static Methods
+
+#### Result.ok
+
+Creates a successful health check result.
+
+<ParamField path="message" type="string" required>
+  Success message describing the healthy state
+</ParamField>
+
+<ParamField path="meta" type="object">
+  Optional metadata to include in the result
+</ParamField>
+
+<ResponseField name="return" type="Result">
+  A Result instance indicating success
+</ResponseField>
+
+```typescript
+import { Result } from '@adonisjs/core/health'
+
+return Result.ok('Service is responding', {
+  responseTime: 45,
+  version: '1.0.0'
+})
+```
+
+#### Result.failed
+
+Creates a failed health check result.
+
+<ParamField path="message" type="string" required>
+  Error message describing the failure
+</ParamField>
+
+<ParamField path="error" type="Error | any">
+  Optional error object or additional context
+</ParamField>
+
+<ResponseField name="return" type="Result">
+  A Result instance indicating failure
+</ResponseField>
+
+```typescript
+import { Result } from '@adonisjs/core/health'
+
+return Result.failed('Service unavailable', new Error('Connection timeout'))
+```
+
+### Properties
+
+<ParamField path="isHealthy" type="boolean">
+  Whether the health check passed
+</ParamField>
+
+<ParamField path="isFailed" type="boolean">
+  Whether the health check failed
+</ParamField>
+
+<ParamField path="message" type="string">
+  The message describing the check result
+</ParamField>
+
+<ParamField path="meta" type="object">
+  Additional metadata about the check
+</ParamField>
+
+## Types
+
+### HealthCheckResult
+
+The result of running all health checks.
+
+```typescript
+type HealthCheckResult = {
+  isHealthy: boolean
+  report: Record<string, CheckReport>
+}
+
+type CheckReport = {
+  displayName: string
+  health: Result
+  duration: number
+}
+```
+
+### Result
+
+The result of a single health check.
+
+```typescript
+type Result = {
+  isHealthy: boolean
+  isFailed: boolean
+  message: string
+  meta?: Record<string, any>
+  error?: Error
+}
+```
+
+## Example Usage
+
+### Registering Health Checks
+
+```typescript
+// start/health.ts
+import { HealthChecks, Result } from '@adonisjs/core/health'
+import db from '@adonisjs/lucid/services/db'
+import redis from '@adonisjs/redis/services/main'
+
+const healthChecks = new HealthChecks()
+
+// Database health check
+healthChecks.addChecker('database', async () => {
+  try {
+    await db.rawQuery('SELECT 1')
+    return Result.ok('Database connection is healthy')
+  } catch (error) {
+    return Result.failed('Database connection failed', error)
+  }
+})
+
+// Redis health check
+healthChecks.addChecker('redis', async () => {
+  try {
+    await redis.ping()
+    return Result.ok('Redis connection is healthy')
+  } catch (error) {
+    return Result.failed('Redis connection failed', error)
+  }
+})
+
+// Memory usage check
+healthChecks.addChecker('memory', async () => {
+  const used = process.memoryUsage()
+  const usedMB = Math.round(used.heapUsed / 1024 / 1024)
+  const maxMB = 512
+  
+  if (usedMB > maxMB) {
+    return Result.failed(`Memory usage too high: ${usedMB}MB / ${maxMB}MB`, {
+      used: usedMB,
+      max: maxMB
+    })
+  }
+  
+  return Result.ok('Memory usage is healthy', {
+    used: usedMB,
+    max: maxMB
+  })
+})
+
+export default healthChecks
+```
+
+### Health Check Endpoint
+
+```typescript
+// app/controllers/health_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import healthChecks from '#start/health'
+
+export default class HealthController {
+  async check({ response }: HttpContext) {
+    const report = await healthChecks.run()
+    
+    if (!report.isHealthy) {
+      return response.serviceUnavailable(report)
+    }
+    
+    return response.ok(report)
+  }
+  
+  async checkDatabase({ response }: HttpContext) {
+    const result = await healthChecks.runChecker('database')
+    
+    if (result.isFailed) {
+      return response.serviceUnavailable({
+        status: 'unhealthy',
+        message: result.message,
+        error: result.error
+      })
+    }
+    
+    return response.ok({
+      status: 'healthy',
+      message: result.message
+    })
+  }
+}
+```
+
+### Route Registration
+
+```typescript
+// start/routes.ts
+import router from '@adonisjs/core/services/router'
+
+const HealthController = () => import('#controllers/health_controller')
+
+router.get('/health', [HealthController, 'check'])
+router.get('/health/database', [HealthController, 'checkDatabase'])
+```
+
+### External Service Health Check
+
+```typescript
+import { Result } from '@adonisjs/core/health'
+import healthChecks from '#start/health'
+
+healthChecks.addChecker('payment-gateway', async () => {
+  try {
+    const startTime = Date.now()
+    const response = await fetch('https://api.payment-gateway.com/health')
+    const duration = Date.now() - startTime
+    
+    if (!response.ok) {
+      return Result.failed('Payment gateway is unavailable', {
+        statusCode: response.status,
+        duration
+      })
+    }
+    
+    return Result.ok('Payment gateway is healthy', {
+      duration,
+      statusCode: response.status
+    })
+  } catch (error) {
+    return Result.failed('Payment gateway check failed', error)
+  }
+})
+```
+
+### Disk Space Check
+
+```typescript
+import { Result } from '@adonisjs/core/health'
+import { promises as fs } from 'node:fs'
+import healthChecks from '#start/health'
+
+healthChecks.addChecker('disk-space', async () => {
+  try {
+    const stats = await fs.statfs('/')
+    const availableGB = (stats.bavail * stats.bsize) / (1024 ** 3)
+    const minRequiredGB = 10
+    
+    if (availableGB < minRequiredGB) {
+      return Result.failed('Low disk space', {
+        available: `${availableGB.toFixed(2)}GB`,
+        required: `${minRequiredGB}GB`
+      })
+    }
+    
+    return Result.ok('Disk space is sufficient', {
+      available: `${availableGB.toFixed(2)}GB`
+    })
+  } catch (error) {
+    return Result.failed('Disk space check failed', error)
+  }
+})
+```
+
+### Kubernetes Liveness and Readiness Probes
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import healthChecks from '#start/health'
+
+export default class ProbesController {
+  // Liveness probe - is the application running?
+  async liveness({ response }: HttpContext) {
+    // Simple check that the app is alive
+    return response.ok({ status: 'alive' })
+  }
+  
+  // Readiness probe - is the application ready to serve traffic?
+  async readiness({ response }: HttpContext) {
+    const report = await healthChecks.run()
+    
+    if (!report.isHealthy) {
+      return response.serviceUnavailable({
+        status: 'not ready',
+        report: report.report
+      })
+    }
+    
+    return response.ok({
+      status: 'ready',
+      report: report.report
+    })
+  }
+}
+```
+
+## Notes
+
+- Health checks are useful for monitoring application health in production
+- They can be used with orchestration tools like Kubernetes for liveness and readiness probes
+- Each health check should be fast and focused on a single dependency
+- Use `Result.ok()` for successful checks and `Result.failed()` for failures
+- Include relevant metadata in results for debugging
+- Consider rate limiting health check endpoints to prevent abuse
+- Health checks should not perform expensive operations that could impact application performance

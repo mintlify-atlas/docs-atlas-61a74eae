@@ -1,0 +1,389 @@
+---
+title: 'Middleware'
+description: 'Middleware API reference for creating and managing HTTP middleware in AdonisJS'
+---
+
+Middleware are functions that execute during the HTTP request lifecycle. They can modify requests, responses, or terminate the request early.
+
+## Creating Middleware
+
+### Middleware Structure
+
+A middleware is a class with a `handle` method:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class AuthMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    // Execute before request
+    console.log('Before request')
+    
+    // Call next middleware or route handler
+    await next()
+    
+    // Execute after response
+    console.log('After response')
+  }
+}
+```
+
+## Middleware Types
+
+### Global Middleware
+
+Global middleware execute for every request.
+
+```typescript
+// start/kernel.ts
+import server from '#services/server'
+
+server.use([
+  () => import('#middleware/container_bindings_middleware'),
+  () => import('@adonisjs/core/bodyparser_middleware')
+])
+```
+
+### Named Middleware
+
+Named middleware can be selectively applied to routes.
+
+```typescript
+// start/kernel.ts
+server.useRouted({
+  auth: () => import('#middleware/auth_middleware'),
+  guest: () => import('#middleware/guest_middleware')
+})
+
+// start/routes.ts
+router.get('/dashboard', [DashboardController, 'index'])
+  .middleware('auth')
+```
+
+### Route Middleware
+
+Middleware applied directly to a specific route.
+
+```typescript
+router.get('/admin', [AdminController, 'index'])
+  .middleware(async ({ auth, response }, next) => {
+    if (!auth.user?.isAdmin) {
+      return response.forbidden('Access denied')
+    }
+    await next()
+  })
+```
+
+## Middleware Methods
+
+### handle()
+
+The main middleware method that processes requests.
+
+<ParamField path="ctx" type="HttpContext">
+  The HTTP context object containing request, response, etc.
+</ParamField>
+
+<ParamField path="next" type="NextFn">
+  Function to call the next middleware or route handler
+</ParamField>
+
+<ParamField path="options" type="any">
+  Optional middleware options/parameters
+</ParamField>
+
+**Returns:** `Promise<void>`
+
+## Middleware Patterns
+
+### Authentication Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class AuthMiddleware {
+  async handle(
+    { auth, response }: HttpContext,
+    next: NextFn
+  ) {
+    // Check authentication
+    try {
+      await auth.authenticate()
+    } catch {
+      return response.unauthorized({ error: 'Not authenticated' })
+    }
+    
+    await next()
+  }
+}
+```
+
+### Authorization Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class RoleMiddleware {
+  async handle(
+    { auth, response }: HttpContext,
+    next: NextFn,
+    options: { roles: string[] }
+  ) {
+    const user = auth.user
+    
+    if (!user || !options.roles.includes(user.role)) {
+      return response.forbidden({ error: 'Access denied' })
+    }
+    
+    await next()
+  }
+}
+```
+
+Usage with options:
+
+```typescript
+router.get('/admin', [AdminController, 'index'])
+  .middleware([RoleMiddleware, { roles: ['admin'] }])
+```
+
+### Logging Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class LoggingMiddleware {
+  async handle(
+    { request, response, logger }: HttpContext,
+    next: NextFn
+  ) {
+    const startTime = Date.now()
+    
+    logger.info(`→ ${request.method()} ${request.url()}`)
+    
+    await next()
+    
+    const duration = Date.now() - startTime
+    logger.info(
+      `← ${request.method()} ${request.url()} - ${response.getStatus()} (${duration}ms)`
+    )
+  }
+}
+```
+
+### CORS Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class CorsMiddleware {
+  async handle(
+    { request, response }: HttpContext,
+    next: NextFn
+  ) {
+    // Set CORS headers
+    response.header('Access-Control-Allow-Origin', '*')
+    response.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE')
+    response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    
+    // Handle preflight requests
+    if (request.method() === 'OPTIONS') {
+      return response.noContent()
+    }
+    
+    await next()
+  }
+}
+```
+
+### Rate Limiting Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+import redis from '@adonisjs/redis/services/main'
+
+export default class RateLimitMiddleware {
+  async handle(
+    { request, response }: HttpContext,
+    next: NextFn,
+    options: { maxRequests: number, windowMs: number } = {
+      maxRequests: 100,
+      windowMs: 60000
+    }
+  ) {
+    const ip = request.ip()
+    const key = `rate-limit:${ip}`
+    
+    const requests = await redis.incr(key)
+    
+    if (requests === 1) {
+      await redis.expire(key, Math.floor(options.windowMs / 1000))
+    }
+    
+    if (requests > options.maxRequests) {
+      return response.tooManyRequests({
+        error: 'Rate limit exceeded'
+      })
+    }
+    
+    response.header('X-RateLimit-Limit', options.maxRequests.toString())
+    response.header('X-RateLimit-Remaining', (options.maxRequests - requests).toString())
+    
+    await next()
+  }
+}
+```
+
+### Request Validation Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+import vine from '@vinejs/vine'
+
+export default class ValidateMiddleware {
+  async handle(
+    { request, response }: HttpContext,
+    next: NextFn,
+    options: { validator: any }
+  ) {
+    try {
+      await request.validateUsing(options.validator)
+    } catch (error) {
+      return response.unprocessableEntity({ errors: error.messages })
+    }
+    
+    await next()
+  }
+}
+```
+
+### Conditional Middleware
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+
+export default class MaintenanceModeMiddleware {
+  async handle(
+    { request, response }: HttpContext,
+    next: NextFn
+  ) {
+    const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true'
+    const isAdminRoute = request.url().startsWith('/admin')
+    
+    if (isMaintenanceMode && !isAdminRoute) {
+      return response.serviceUnavailable({
+        error: 'Service is under maintenance'
+      })
+    }
+    
+    await next()
+  }
+}
+```
+
+## Middleware Execution Order
+
+Middleware execute in the order they are registered:
+
+1. **Global middleware** - Execute for all requests
+2. **Named middleware** - Execute for specific routes
+3. **Route handler** - The actual route controller/handler
+4. **Response middleware** - Execute after the route handler
+
+```typescript
+server.use([
+  () => import('#middleware/initialize_middleware'),      // 1
+  () => import('@adonisjs/core/bodyparser_middleware')   // 2
+])
+
+router.get('/users', [UsersController, 'index'])
+  .middleware('auth')                                     // 3
+  .middleware('throttle')                                 // 4
+  // Route handler executes here                         // 5
+```
+
+## Terminating Middleware
+
+Middleware can terminate the request by not calling `next()`:
+
+```typescript
+export default class BlockedIpMiddleware {
+  async handle({ request, response }: HttpContext, next: NextFn) {
+    const blockedIps = ['192.168.1.1', '10.0.0.1']
+    
+    if (blockedIps.includes(request.ip())) {
+      return response.forbidden({ error: 'IP blocked' })
+      // next() is not called, request is terminated
+    }
+    
+    await next()
+  }
+}
+```
+
+## Error Handling in Middleware
+
+```typescript
+export default class ErrorHandlingMiddleware {
+  async handle(ctx: HttpContext, next: NextFn) {
+    try {
+      await next()
+    } catch (error) {
+      ctx.logger.error(error)
+      ctx.response.internalServerError({
+        error: 'Something went wrong'
+      })
+    }
+  }
+}
+```
+
+## Middleware with Dependencies
+
+```typescript
+import { inject } from '@adonisjs/core'
+import type { HttpContext } from '@adonisjs/core/http'
+import type { NextFn } from '@adonisjs/core/types/http'
+import { LoggerService } from '@adonisjs/core/types'
+
+@inject()
+export default class LoggingMiddleware {
+  constructor(protected logger: LoggerService) {}
+  
+  async handle(ctx: HttpContext, next: NextFn) {
+    this.logger.info(`Request: ${ctx.request.url()}`)
+    await next()
+  }
+}
+```
+
+## Testing Middleware
+
+```typescript
+import { test } from '@japa/runner'
+import AuthMiddleware from '#middleware/auth_middleware'
+
+test.group('Auth Middleware', () => {
+  test('redirects unauthenticated users', async ({ client }) => {
+    const response = await client.get('/dashboard')
+    response.assertStatus(401)
+  })
+  
+  test('allows authenticated users', async ({ client }) => {
+    const response = await client
+      .get('/dashboard')
+      .withGuard('web')
+      .loginAs(user)
+    
+    response.assertStatus(200)
+  })
+})
+```

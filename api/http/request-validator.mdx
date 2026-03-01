@@ -1,0 +1,403 @@
+---
+title: 'RequestValidator'
+description: 'RequestValidator API reference for validating HTTP requests using VineJS'
+---
+
+The `RequestValidator` class provides a convenient API for validating HTTP request data using VineJS validators. It automatically includes request body, files, URL parameters, headers, and cookies in the validation data.
+
+## Importing
+
+```typescript
+import { RequestValidator } from '@adonisjs/core/http'
+```
+
+## Overview
+
+The RequestValidator is accessible through the `request` object in your HTTP context:
+
+```typescript
+import { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async store({ request }: HttpContext) {
+    const data = await request.validateUsing(createUserValidator)
+  }
+}
+```
+
+## Static Properties
+
+### errorReporter
+
+Custom error reporter function for all validations.
+
+```typescript
+import { RequestValidator } from '@adonisjs/core/http'
+import { SimpleErrorReporter } from '@vinejs/vine'
+
+RequestValidator.errorReporter = (ctx) => {
+  return new SimpleErrorReporter()
+}
+```
+
+<ParamField path="errorReporter" type="(ctx: HttpContext) => ErrorReporterContract">
+  Function that returns an error reporter instance based on the HTTP context
+</ParamField>
+
+### messagesProvider
+
+Custom messages provider for all validations.
+
+```typescript
+import { RequestValidator } from '@adonisjs/core/http'
+import { messages } from '#validators/messages'
+
+RequestValidator.messagesProvider = (ctx) => {
+  return messages
+}
+```
+
+<ParamField path="messagesProvider" type="(ctx: HttpContext) => MessagesProviderContact">
+  Function that returns a messages provider instance based on the HTTP context
+</ParamField>
+
+## Methods
+
+### validateUsing()
+
+Validate HTTP request data using a VineJS validator. Throws a `ValidationError` if validation fails.
+
+```typescript
+import vine from '@vinejs/vine'
+
+const createUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+    name: vine.string().minLength(3),
+    password: vine.string().minLength(8)
+  })
+)
+
+export default class UsersController {
+  async store({ request }: HttpContext) {
+    const data = await request.validateUsing(createUserValidator)
+    // data is fully typed based on the validator schema
+  }
+}
+```
+
+<ParamField path="validator" type="VineValidator<Schema, MetaData>">
+  VineJS validator instance created with `vine.compile()`
+</ParamField>
+
+<ParamField path="options" type="RequestValidationOptions<MetaData>">
+  Optional validation options:
+  - `errorReporter`: Custom error reporter function
+  - `messagesProvider`: Custom messages provider
+  - `data`: Custom data to validate (overrides default request data)
+  - Additional VineJS validation options
+</ParamField>
+
+**Returns:** `Promise<Infer<Schema>>`
+
+**Throws:** `ValidationError` if validation fails
+
+### tryValidateUsing()
+
+Validate HTTP request data without throwing errors. Returns a tuple with either the error or validated data.
+
+```typescript
+export default class UsersController {
+  async store({ request, response }: HttpContext) {
+    const [error, data] = await request.tryValidateUsing(createUserValidator)
+    
+    if (error) {
+      return response.unprocessableEntity({
+        errors: error.messages
+      })
+    }
+    
+    // Use validated data
+    const user = await User.create(data)
+    return response.created({ user })
+  }
+}
+```
+
+<ParamField path="validator" type="VineValidator<Schema, MetaData>">
+  VineJS validator instance created with `vine.compile()`
+</ParamField>
+
+<ParamField path="options" type="RequestValidationOptions<MetaData>">
+  Optional validation options (same as `validateUsing`)
+</ParamField>
+
+**Returns:** `Promise<[ValidationError, null] | [null, Infer<Schema>]>`
+
+## Validation Data
+
+By default, the validator includes the following data from the request:
+
+- **Body data**: All form fields and JSON data
+- **Files**: Uploaded files
+- **URL parameters**: Route parameters (available as `params`)
+- **Headers**: Request headers (available as `headers`)
+- **Cookies**: Request cookies (available as `cookies`)
+
+```typescript
+const validator = vine.compile(
+  vine.object({
+    // Request body
+    email: vine.string().email(),
+    name: vine.string(),
+    
+    // Route parameters
+    params: vine.object({
+      id: vine.number()
+    }),
+    
+    // Headers
+    headers: vine.object({
+      authorization: vine.string()
+    }),
+    
+    // Cookies
+    cookies: vine.object({
+      session_id: vine.string()
+    })
+  })
+)
+```
+
+## Validation Options
+
+### Custom Error Reporter
+
+Provide a custom error reporter for specific validations:
+
+```typescript
+import { SimpleErrorReporter } from '@vinejs/vine'
+
+const data = await request.validateUsing(createUserValidator, {
+  errorReporter: () => new SimpleErrorReporter()
+})
+```
+
+### Custom Messages
+
+Provide custom validation messages:
+
+```typescript
+const messages = {
+  'email.required': 'Email address is required',
+  'email.email': 'Please provide a valid email address',
+  'password.minLength': 'Password must be at least {{ min }} characters'
+}
+
+const data = await request.validateUsing(createUserValidator, {
+  messagesProvider: messages
+})
+```
+
+### Custom Validation Data
+
+Validate custom data instead of request data:
+
+```typescript
+const customData = {
+  email: 'user@example.com',
+  name: 'John Doe'
+}
+
+const data = await request.validateUsing(createUserValidator, {
+  data: customData
+})
+```
+
+### Metadata
+
+Pass metadata to validators that require it:
+
+```typescript
+const updateUserValidator = vine.withMetaData<{ userId: number }>().compile(
+  vine.object({
+    email: vine.string().email()
+  })
+)
+
+const data = await request.validateUsing(updateUserValidator, {
+  meta: { userId: 1 }
+})
+```
+
+## Creating Validators
+
+Create reusable validators in a separate file:
+
+```typescript
+// validators/user.ts
+import vine from '@vinejs/vine'
+
+export const createUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().normalizeEmail(),
+    name: vine.string().minLength(3).maxLength(50),
+    password: vine.string().minLength(8).confirmed(),
+    age: vine.number().min(18).optional()
+  })
+)
+
+export const updateUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().normalizeEmail().optional(),
+    name: vine.string().minLength(3).maxLength(50).optional(),
+    age: vine.number().min(18).optional()
+  })
+)
+```
+
+Use in controllers:
+
+```typescript
+import { createUserValidator, updateUserValidator } from '#validators/user'
+
+export default class UsersController {
+  async store({ request }: HttpContext) {
+    const data = await request.validateUsing(createUserValidator)
+    return User.create(data)
+  }
+  
+  async update({ request, params }: HttpContext) {
+    const data = await request.validateUsing(updateUserValidator)
+    const user = await User.findOrFail(params.id)
+    await user.merge(data).save()
+    return user
+  }
+}
+```
+
+## Error Handling
+
+Validation errors are automatically formatted and include:
+
+```typescript
+try {
+  await request.validateUsing(createUserValidator)
+} catch (error) {
+  // error.messages contains formatted error messages
+  console.log(error.messages)
+  /*
+  [
+    {
+      field: 'email',
+      message: 'The email field must be a valid email address',
+      rule: 'email'
+    },
+    {
+      field: 'password',
+      message: 'The password field must be at least 8 characters',
+      rule: 'minLength',
+      args: { min: 8 }
+    }
+  ]
+  */
+}
+```
+
+## Global Configuration
+
+Configure validators globally in a provider:
+
+```typescript
+// providers/app_provider.ts
+import { ApplicationService } from '@adonisjs/core/types'
+import { RequestValidator } from '@adonisjs/core/http'
+import { SimpleErrorReporter } from '@vinejs/vine'
+import { messages } from '#validators/messages'
+
+export default class AppProvider {
+  constructor(protected app: ApplicationService) {}
+  
+  async boot() {
+    // Global error reporter
+    RequestValidator.errorReporter = () => {
+      return new SimpleErrorReporter()
+    }
+    
+    // Global messages provider
+    RequestValidator.messagesProvider = () => {
+      return messages
+    }
+  }
+}
+```
+
+## Example: Complex Validation
+
+```typescript
+import vine from '@vinejs/vine'
+import { HttpContext } from '@adonisjs/core/http'
+
+// Validator with nested objects and arrays
+const createOrderValidator = vine.compile(
+  vine.object({
+    customer: vine.object({
+      name: vine.string().minLength(3),
+      email: vine.string().email(),
+      phone: vine.string().mobile()
+    }),
+    items: vine.array(
+      vine.object({
+        productId: vine.number(),
+        quantity: vine.number().min(1),
+        price: vine.number().min(0)
+      })
+    ).minLength(1),
+    shippingAddress: vine.object({
+      street: vine.string(),
+      city: vine.string(),
+      state: vine.string(),
+      zipCode: vine.string().postal()
+    }),
+    paymentMethod: vine.enum(['card', 'paypal', 'cash'])
+  })
+)
+
+export default class OrdersController {
+  async store({ request, response }: HttpContext) {
+    const [error, data] = await request.tryValidateUsing(createOrderValidator)
+    
+    if (error) {
+      return response.unprocessableEntity({
+        message: 'Validation failed',
+        errors: error.messages
+      })
+    }
+    
+    const order = await Order.create(data)
+    return response.created({ order })
+  }
+}
+```
+
+## Type Safety
+
+The validator provides full TypeScript type inference:
+
+```typescript
+const validator = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+    age: vine.number(),
+    isActive: vine.boolean().optional()
+  })
+)
+
+const data = await request.validateUsing(validator)
+// data type is inferred as:
+// {
+//   email: string
+//   age: number
+//   isActive?: boolean
+// }
+```

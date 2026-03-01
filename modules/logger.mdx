@@ -1,0 +1,349 @@
+---
+title: Logger
+description: Structured logging API built on Pino
+---
+
+The Logger module re-exports all functionality from `@adonisjs/logger` and provides utilities for structured logging in your AdonisJS application.
+
+## Import
+
+```typescript
+import { destination, syncDestination } from '@adonisjs/core/logger'
+import type { LoggerConfig, PrettyTargetOptions } from '@adonisjs/core/logger'
+```
+
+## Overview
+
+The Logger module provides a structured logging system built on top of Pino. It supports multiple log levels, structured data, and various output formats including pretty-printed logs for development.
+
+## Functions
+
+### syncDestination
+
+Creates a synchronous Pino Pretty stream for formatted log output.
+
+<Info>
+This function is specifically designed for testing and development environments where synchronous log output is preferred. By default, Pino uses asynchronous logging which can make it difficult to correlate logs with specific actions during debugging or testing.
+</Info>
+
+<ParamField path="options" type="PrettyTargetOptions">
+  Optional configuration options for the pretty printer
+  
+  <ParamField path="colorize" type="boolean">
+    Enable or disable colorized output
+  </ParamField>
+  
+  <ParamField path="translateTime" type="string | boolean">
+    Format for timestamp translation
+  </ParamField>
+  
+  <ParamField path="ignore" type="string">
+    Comma-separated list of keys to ignore in output
+  </ParamField>
+  
+  <ParamField path="singleLine" type="boolean">
+    Print each log on a single line
+  </ParamField>
+</ParamField>
+
+<ResponseField name="return" type="Promise<LoggerConfig['desination']>">
+  A promise that resolves to a PrettyStream instance if color is supported, otherwise a standard destination
+</ResponseField>
+
+```typescript
+import { syncDestination } from '@adonisjs/core/logger'
+import env from '@adonisjs/core/services/env'
+import app from '@adonisjs/core/services/app'
+
+const loggerConfig = defineConfig({
+  default: 'app',
+  loggers: {
+    app: {
+      enabled: true,
+      name: env.get('APP_NAME'),
+      level: env.get('LOG_LEVEL'),
+      desination: !app.inProduction && (await syncDestination()),
+      transport: {
+        targets: [targets.file({ destination: 1 })],
+      },
+    },
+  }
+})
+```
+
+### destination
+
+Creates a standard Pino destination stream.
+
+<ParamField path="target" type="number | string" required>
+  The destination target. Use `1` for stdout, `2` for stderr, or a file path string.
+</ParamField>
+
+<ResponseField name="return" type="DestinationStream">
+  A Pino destination stream
+</ResponseField>
+
+```typescript
+import { destination } from '@adonisjs/core/logger'
+
+// Log to stdout
+const stdout = destination(1)
+
+// Log to stderr
+const stderr = destination(2)
+
+// Log to file
+const fileStream = destination('./logs/app.log')
+```
+
+## Logger Instance
+
+The logger instance is available via dependency injection and provides methods for different log levels.
+
+### Methods
+
+#### trace
+
+Logs a trace level message (lowest priority).
+
+<ParamField path="message" type="string | object" required>
+  The message to log or an object with structured data
+</ParamField>
+
+<ParamField path="...args" type="any[]">
+  Additional arguments for message formatting
+</ParamField>
+
+```typescript
+import logger from '@adonisjs/core/services/logger'
+
+logger.trace('Entering function')
+logger.trace({ userId: 1, action: 'login' }, 'User login trace')
+```
+
+#### debug
+
+Logs a debug level message.
+
+<ParamField path="message" type="string | object" required>
+  The message to log or an object with structured data
+</ParamField>
+
+<ParamField path="...args" type="any[]">
+  Additional arguments for message formatting
+</ParamField>
+
+```typescript
+logger.debug('Database query executed')
+logger.debug({ query: 'SELECT * FROM users', duration: 45 }, 'Query completed')
+```
+
+#### info
+
+Logs an info level message.
+
+<ParamField path="message" type="string | object" required>
+  The message to log or an object with structured data
+</ParamField>
+
+<ParamField path="...args" type="any[]">
+  Additional arguments for message formatting
+</ParamField>
+
+```typescript
+logger.info('Server started on port 3333')
+logger.info({ port: 3333, env: 'production' }, 'Server started')
+```
+
+#### warn
+
+Logs a warning level message.
+
+<ParamField path="message" type="string | object" required>
+  The message to log or an object with structured data
+</ParamField>
+
+<ParamField path="...args" type="any[]">
+  Additional arguments for message formatting
+</ParamField>
+
+```typescript
+logger.warn('Deprecated API usage detected')
+logger.warn({ endpoint: '/api/old', ip: '192.168.1.1' }, 'Deprecated endpoint used')
+```
+
+#### error
+
+Logs an error level message.
+
+<ParamField path="message" type="string | object | Error" required>
+  The message, error object, or structured data to log
+</ParamField>
+
+<ParamField path="...args" type="any[]">
+  Additional arguments for message formatting
+</ParamField>
+
+```typescript
+logger.error('Failed to connect to database')
+logger.error(new Error('Connection timeout'))
+logger.error({ error: 'ECONNREFUSED', host: 'localhost' }, 'Database connection failed')
+```
+
+#### fatal
+
+Logs a fatal level message (highest priority).
+
+<ParamField path="message" type="string | object | Error" required>
+  The message, error object, or structured data to log
+</ParamField>
+
+<ParamField path="...args" type="any[]">
+  Additional arguments for message formatting
+</ParamField>
+
+```typescript
+logger.fatal('Application crashed')
+logger.fatal(new Error('Unrecoverable error'), 'System failure')
+```
+
+#### child
+
+Creates a child logger with additional context.
+
+<ParamField path="bindings" type="object" required>
+  Object with key-value pairs to add to all logs from this child logger
+</ParamField>
+
+<ResponseField name="return" type="Logger">
+  A new logger instance with the additional bindings
+</ResponseField>
+
+```typescript
+const requestLogger = logger.child({ requestId: '123', userId: 456 })
+requestLogger.info('Processing request') // Will include requestId and userId
+```
+
+## Types
+
+### LoggerConfig
+
+Configuration type for the logger.
+
+```typescript
+type LoggerConfig = {
+  default: string
+  loggers: Record<string, LoggerOptions>
+}
+
+type LoggerOptions = {
+  enabled: boolean
+  name: string
+  level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+  desination?: DestinationStream
+  transport?: TransportOptions
+}
+```
+
+### PrettyTargetOptions
+
+Options for configuring the pretty printer.
+
+```typescript
+type PrettyTargetOptions = {
+  colorize?: boolean
+  translateTime?: string | boolean
+  ignore?: string
+  singleLine?: boolean
+  levelFirst?: boolean
+  messageKey?: string
+  timestampKey?: string
+}
+```
+
+## Example Usage
+
+### Basic Logging
+
+```typescript
+import logger from '@adonisjs/core/services/logger'
+
+// Simple messages
+logger.info('User logged in')
+logger.warn('API rate limit approaching')
+logger.error('Payment processing failed')
+
+// Structured logging
+logger.info({
+  userId: 123,
+  action: 'login',
+  ip: '192.168.1.1',
+  timestamp: new Date()
+}, 'User authentication successful')
+
+// Logging errors
+try {
+  await riskyOperation()
+} catch (error) {
+  logger.error(error, 'Operation failed')
+}
+```
+
+### Child Loggers
+
+```typescript
+import logger from '@adonisjs/core/services/logger'
+
+class UserService {
+  private logger = logger.child({ service: 'UserService' })
+  
+  async createUser(data: any) {
+    this.logger.info({ data }, 'Creating user')
+    
+    try {
+      const user = await User.create(data)
+      this.logger.info({ userId: user.id }, 'User created successfully')
+      return user
+    } catch (error) {
+      this.logger.error(error, 'Failed to create user')
+      throw error
+    }
+  }
+}
+```
+
+### Configuration Example
+
+```typescript
+import { defineConfig } from '@adonisjs/logger'
+import { syncDestination } from '@adonisjs/core/logger'
+import env from '@adonisjs/core/services/env'
+import app from '@adonisjs/core/services/app'
+
+export default defineConfig({
+  default: 'app',
+  
+  loggers: {
+    app: {
+      enabled: true,
+      name: env.get('APP_NAME'),
+      level: env.get('LOG_LEVEL', 'info'),
+      desination: !app.inProduction && (await syncDestination({
+        colorize: true,
+        translateTime: 'HH:MM:ss',
+        ignore: 'pid,hostname',
+        singleLine: false
+      }))
+    }
+  }
+})
+```
+
+## Notes
+
+- The logger is built on Pino for high performance
+- Structured logging is recommended for better log analysis
+- Use appropriate log levels: trace < debug < info < warn < error < fatal
+- Child loggers inherit the parent logger's configuration and bindings
+- In production, consider using asynchronous logging for better performance
+- Use `syncDestination` only in development/testing environments

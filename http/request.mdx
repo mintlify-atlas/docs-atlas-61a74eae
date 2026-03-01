@@ -1,0 +1,418 @@
+---
+title: Request
+description: Access and process incoming HTTP request data in AdonisJS using the Request object
+---
+
+The Request object provides access to all incoming HTTP request data including query strings, request body, headers, cookies, and uploaded files.
+
+## Accessing the request
+
+The request object is available on the `HttpContext`:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import router from '@adonisjs/core/services/router'
+
+router.post('/users', ({ request }: HttpContext) => {
+  // Access request data
+  const body = request.all()
+  return { received: body }
+})
+```
+
+## Request body
+
+Access the parsed request body:
+
+```typescript
+// Get all body data
+const body = request.all()
+
+// Get specific fields
+const email = request.input('email')
+const name = request.input('name')
+
+// Get with default value
+const role = request.input('role', 'user')
+
+// Get only specific fields
+const data = request.only(['email', 'name', 'password'])
+
+// Get all fields except specific ones
+const data = request.except(['password', 'password_confirmation'])
+```
+
+### Nested data
+
+Access nested request data using dot notation:
+
+```typescript
+// Request body: { user: { profile: { name: 'John' } } }
+const name = request.input('user.profile.name')
+// Returns: 'John'
+```
+
+## Query strings
+
+Access URL query parameters:
+
+```typescript
+// URL: /users?page=2&limit=10
+
+const page = request.qs('page')
+// Returns: '2'
+
+const limit = request.qs('limit', '20') // with default
+// Returns: '10'
+
+// Get all query params
+const query = request.qs()
+// Returns: { page: '2', limit: '10' }
+```
+
+## Route parameters
+
+Access dynamic route parameters:
+
+```typescript
+router.get('/users/:id', ({ params }) => {
+  const userId = params.id
+  return { userId }
+})
+
+// Multiple parameters
+router.get('/posts/:id/:slug', ({ params }) => {
+  return {
+    id: params.id,
+    slug: params.slug
+  }
+})
+```
+
+## Request headers
+
+Access request headers:
+
+```typescript
+// Get specific header
+const contentType = request.header('content-type')
+const authorization = request.header('authorization')
+
+// Get with default value
+const apiKey = request.header('api-key', 'default-key')
+
+// Get all headers
+const headers = request.headers()
+```
+
+## Request method
+
+Get the HTTP method:
+
+```typescript
+const method = request.method()
+// Returns: 'GET', 'POST', 'PUT', 'DELETE', etc.
+
+// Check method
+if (request.method() === 'POST') {
+  // Handle POST request
+}
+```
+
+## Request URL
+
+Access URL information:
+
+```typescript
+// Full URL
+const url = request.url()
+// Returns: '/users/1?tab=profile'
+
+// URL without query string
+const pathname = request.pathname()
+// Returns: '/users/1'
+
+// Get full URL with protocol and host
+const completeUrl = request.completeUrl()
+// Returns: 'http://localhost:3333/users/1?tab=profile'
+```
+
+## Request IP address
+
+Get the client's IP address:
+
+```typescript
+const ip = request.ip()
+// Returns: '127.0.0.1'
+
+// Get all IP addresses (including proxy IPs)
+const ips = request.ips()
+// Returns: ['127.0.0.1', '192.168.1.1']
+```
+
+## Cookies
+
+Access request cookies:
+
+```typescript
+// Get specific cookie
+const sessionId = request.cookie('session_id')
+
+// Get with default value
+const theme = request.cookie('theme', 'light')
+
+// Get all cookies as an object
+const cookies = request.cookies()
+
+// Get all cookies as an array of objects
+const cookiesList = request.cookiesList()
+// Returns: [{ name: 'session_id', value: 'abc123' }, ...]
+```
+
+## File uploads
+
+Access uploaded files (requires `@adonisjs/bodyparser`):
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+router.post('/upload', async ({ request }) => {
+  // Get a single file
+  const avatar = request.file('avatar')
+  
+  if (avatar) {
+    // Check if file is valid
+    if (avatar.isValid) {
+      // Move file to uploads directory
+      await avatar.move('uploads', {
+        name: `${Date.now()}.${avatar.extname}`
+      })
+      
+      return { uploaded: true, fileName: avatar.fileName }
+    }
+    
+    return { error: avatar.errors }
+  }
+  
+  return { error: 'No file uploaded' }
+})
+```
+
+### Multiple file uploads
+
+```typescript
+router.post('/upload-multiple', async ({ request }) => {
+  const images = request.files('images')
+  
+  for (const image of images) {
+    if (image.isValid) {
+      await image.move('uploads')
+    }
+  }
+  
+  return { uploaded: images.length }
+})
+```
+
+### File validation
+
+```typescript
+const avatar = request.file('avatar', {
+  size: '2mb',
+  extnames: ['jpg', 'png', 'jpeg']
+})
+
+if (!avatar) {
+  return { error: 'Avatar is required' }
+}
+
+if (!avatar.isValid) {
+  return { errors: avatar.errors }
+}
+```
+
+## Content negotiation
+
+Determine the accepted response format:
+
+```typescript
+// Check if client accepts JSON
+if (request.accepts(['json'])) {
+  return response.json({ data })
+}
+
+// Check if client accepts HTML
+if (request.accepts(['html'])) {
+  return view.render('users/index', { data })
+}
+
+// Get best matching format
+const format = request.accepts(['json', 'html'])
+// Returns: 'json' or 'html' based on Accept header
+```
+
+## Request validation
+
+Validate request data using VineJS validators:
+
+```typescript
+import vine from '@vinejs/vine'
+
+const createUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+    name: vine.string().minLength(3),
+    password: vine.string().minLength(8)
+  })
+)
+
+router.post('/users', async ({ request }) => {
+  // Validate and get data
+  const data = await request.validateUsing(createUserValidator)
+  
+  // data is now typed and validated
+  const user = await User.create(data)
+  return { user }
+})
+```
+
+See the [Validation](/http/validation) documentation for more details.
+
+## Request context
+
+Store custom data on the request for use in middleware and handlers:
+
+```typescript
+// In middleware
+export default class AuthMiddleware {
+  async handle({ request }: HttpContext, next: NextFn) {
+    const user = await authenticateUser()
+    
+    // Store user on request context
+    request.ctx.user = user
+    
+    return await next()
+  }
+}
+
+// In route handler
+router.get('/profile', ({ request }) => {
+  const user = request.ctx.user
+  return { user }
+})
+```
+
+## Checking request properties
+
+### Ajax requests
+
+```typescript
+if (request.ajax()) {
+  // Request was made via AJAX
+  return response.json({ data })
+}
+```
+
+### Content type
+
+```typescript
+if (request.is(['json', 'application/json'])) {
+  // Request has JSON content type
+}
+
+if (request.is(['html'])) {
+  // Request has HTML content type
+}
+```
+
+### Request origin
+
+```typescript
+const hostname = request.hostname()
+// Returns: 'localhost' or 'example.com'
+
+const protocol = request.protocol()
+// Returns: 'http' or 'https'
+
+const isSecure = request.secure()
+// Returns: true if HTTPS
+```
+
+## Extending the Request class
+
+Add custom methods to the Request class:
+
+```typescript
+import { Request } from '@adonisjs/core/http'
+
+Request.macro('getUser', function () {
+  return this.ctx.user
+})
+
+// Use in route handlers
+router.get('/profile', ({ request }) => {
+  const user = request.getUser()
+  return { user }
+})
+```
+
+## TypeScript support
+
+The request object is fully typed. Use TypeScript to get autocomplete and type checking:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+router.post('/users', ({ request }: HttpContext) => {
+  // All request methods are typed
+  const email: string | undefined = request.input('email')
+  const data: Record<string, any> = request.all()
+})
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Always validate user input">
+    Never trust user input. Always validate request data using validators before processing:
+    
+    ```typescript
+    const data = await request.validateUsing(validator)
+    // Now data is typed and validated
+    ```
+  </Accordion>
+  
+  <Accordion title="Use only() and except() for mass assignment">
+    When creating or updating records, use `only()` or `except()` to prevent mass assignment vulnerabilities:
+    
+    ```typescript
+    // Only allow specific fields
+    const data = request.only(['email', 'name'])
+    
+    // Exclude sensitive fields
+    const data = request.except(['role', 'is_admin'])
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate file uploads">
+    Always validate file uploads for size and type:
+    
+    ```typescript
+    const file = request.file('avatar', {
+      size: '2mb',
+      extnames: ['jpg', 'png']
+    })
+    
+    if (!file?.isValid) {
+      return response.badRequest({ errors: file?.errors })
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use appropriate methods">
+    - Use `input()` for single values with defaults
+    - Use `only()` for selecting specific fields
+    - Use `except()` for excluding specific fields
+    - Use `all()` when you need everything
+  </Accordion>
+</AccordionGroup>

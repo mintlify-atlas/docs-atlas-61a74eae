@@ -1,0 +1,343 @@
+---
+title: Controllers
+description: Organize your HTTP request handling logic into controller classes in AdonisJS
+---
+
+Controllers are classes that group related request handling logic together. They help keep your routes file clean and make your code more maintainable.
+
+## Creating a controller
+
+Use the `make:controller` Ace command to create a new controller:
+
+```bash
+node ace make:controller User
+```
+
+This creates a controller file at `app/controllers/users_controller.ts`:
+
+```typescript
+// import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+}
+```
+
+### Controller naming conventions
+
+By default, controllers are:
+- Created in plural form (e.g., `UsersController` for "User")
+- Stored in `app/controllers/` directory
+- Named with a `_controller.ts` suffix
+
+Use the `--singular` flag to create a singular controller:
+
+```bash
+node ace make:controller User --singular
+# Creates: UserController
+```
+
+## Defining controller methods
+
+Add methods to your controller to handle different routes:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  /**
+   * Display a list of users
+   */
+  async index({ response }: HttpContext) {
+    const users = await User.all()
+    return response.json({ users })
+  }
+
+  /**
+   * Create a new user
+   */
+  async store({ request, response }: HttpContext) {
+    const data = request.all()
+    const user = await User.create(data)
+    return response.created({ user })
+  }
+
+  /**
+   * Show a specific user
+   */
+  async show({ params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+    return response.json({ user })
+  }
+
+  /**
+   * Update a user
+   */
+  async update({ params, request, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+    const data = request.all()
+    await user.merge(data).save()
+    return response.json({ user })
+  }
+
+  /**
+   * Delete a user
+   */
+  async destroy({ params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+    await user.delete()
+    return response.noContent()
+  }
+}
+```
+
+## Binding controllers to routes
+
+Reference controllers in your routes using the string syntax or array syntax:
+
+### String reference (recommended)
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+// Format: #controllers/controller_file_name.methodName
+router.get('/users', '#controllers/users_controller.index')
+router.post('/users', '#controllers/users_controller.store')
+router.get('/users/:id', '#controllers/users_controller.show')
+```
+
+The `#controllers/` prefix is an import alias that maps to your `app/controllers` directory.
+
+### Array reference
+
+```typescript
+import router from '@adonisjs/core/services/router'
+import UsersController from '#controllers/users_controller'
+
+router.get('/users', [UsersController, 'index'])
+router.post('/users', [UsersController, 'store'])
+```
+
+### Lazy-loaded controllers
+
+For better performance, lazy-load controllers:
+
+```typescript
+router.get('/users', [
+  () => import('#controllers/users_controller'),
+  'index'
+])
+```
+
+## Resourceful controllers
+
+Create a controller with RESTful methods using the `--resource` flag:
+
+```bash
+node ace make:controller User --resource
+```
+
+This generates a controller with all RESTful methods:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  /**
+   * Display a list of resource
+   */
+  async index({}: HttpContext) {}
+
+  /**
+   * Display form to create a new record
+   */
+  async create({}: HttpContext) {}
+
+  /**
+   * Handle form submission for the create action
+   */
+  async store({ request }: HttpContext) {}
+
+  /**
+   * Show individual record
+   */
+  async show({ params }: HttpContext) {}
+
+  /**
+   * Edit individual record
+   */
+  async edit({ params }: HttpContext) {}
+
+  /**
+   * Handle form submission for the edit action
+   */
+  async update({ params, request }: HttpContext) {}
+
+  /**
+   * Delete record
+   */
+  async destroy({ params }: HttpContext) {}
+}
+```
+
+Bind it to routes:
+
+```typescript
+router.resource('users', '#controllers/users_controller')
+```
+
+## API controllers
+
+For API-only applications, use the `--api` flag to exclude `create` and `edit` methods:
+
+```bash
+node ace make:controller User --api
+```
+
+This creates a controller with methods suitable for REST APIs:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  /**
+   * Display a list of resource
+   */
+  async index({}: HttpContext) {}
+
+  /**
+   * Handle form submission for the create action
+   */
+  async store({ request }: HttpContext) {}
+
+  /**
+   * Show individual record
+   */
+  async show({ params }: HttpContext) {}
+
+  /**
+   * Handle form submission for the edit action
+   */
+  async update({ params, request }: HttpContext) {}
+
+  /**
+   * Delete record
+   */
+  async destroy({ params }: HttpContext) {}
+}
+```
+
+## Custom action controllers
+
+Create a controller with specific methods:
+
+```bash
+node ace make:controller User index show deleteProfile
+```
+
+This generates:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async index({}: HttpContext) {}
+  async show({}: HttpContext) {}
+  async deleteProfile({}: HttpContext) {}
+}
+```
+
+## Nested controllers
+
+Organize controllers in subdirectories:
+
+```bash
+node ace make:controller Admin/User
+```
+
+Creates: `app/controllers/admin/users_controller.ts`
+
+Reference in routes:
+
+```typescript
+router.get('/admin/users', '#controllers/admin/users_controller.index')
+```
+
+## Dependency injection
+
+Controllers support dependency injection through constructor parameters:
+
+```typescript
+import { inject } from '@adonisjs/core'
+import UserService from '#services/user_service'
+
+@inject()
+export default class UsersController {
+  constructor(protected userService: UserService) {}
+
+  async index({ response }: HttpContext) {
+    const users = await this.userService.getAllUsers()
+    return response.json({ users })
+  }
+}
+```
+
+## Accessing HttpContext properties
+
+The `HttpContext` object provides access to various request/response properties:
+
+```typescript
+export default class UsersController {
+  async store({ request, response, auth, session, params }: HttpContext) {
+    // Request data
+    const body = request.all()
+    const email = request.input('email')
+    
+    // URL parameters
+    const id = params.id
+    
+    // Authentication
+    const user = await auth.user
+    
+    // Session
+    session.flash('message', 'User created')
+    
+    // Response
+    return response.created({ user })
+  }
+}
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Keep controllers focused">
+    Each controller should handle a single resource. If your controller is getting too large, consider splitting it into multiple controllers or extracting logic into services.
+  </Accordion>
+  
+  <Accordion title="Use services for business logic">
+    Controllers should be thin and delegate complex business logic to service classes. This makes your code more testable and maintainable.
+  </Accordion>
+  
+  <Accordion title="Validate input in controllers">
+    Always validate user input using request validators before processing:
+    
+    ```typescript
+    async store({ request }: HttpContext) {
+      const data = await request.validateUsing(createUserValidator)
+      const user = await User.create(data)
+      return { user }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use consistent naming">
+    Follow RESTful naming conventions for controller methods:
+    - `index` - List all resources
+    - `create` - Show form to create a resource
+    - `store` - Create a new resource
+    - `show` - Show a specific resource
+    - `edit` - Show form to edit a resource
+    - `update` - Update a resource
+    - `destroy` - Delete a resource
+  </Accordion>
+</AccordionGroup>

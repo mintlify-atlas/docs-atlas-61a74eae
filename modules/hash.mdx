@@ -1,0 +1,414 @@
+---
+title: Hash
+description: Password hashing API with multiple driver support
+---
+
+The Hash module provides password hashing functionality with support for multiple hashing algorithms including Scrypt, Bcrypt, and Argon2.
+
+## Import
+
+```typescript
+import { HashManager, Hash } from '@adonisjs/core/hash'
+import { defineConfig, drivers } from '@adonisjs/core/hash'
+import type { HashConfig, ScryptConfig, BcryptConfig, ArgonConfig } from '@adonisjs/core/types/hash'
+```
+
+## Overview
+
+The Hash module provides a unified API for password hashing using different algorithms. It includes a manager for handling multiple hash drivers and built-in drivers for Scrypt, Bcrypt, and Argon2.
+
+## Functions
+
+### defineConfig
+
+Defines the hash service configuration with lazy loading support.
+
+<ParamField path="config" type="object" required>
+  Configuration object containing default hasher and list of hashers
+  
+  <ParamField path="default" type="string">
+    Optional default hasher name (must exist in the list)
+  </ParamField>
+  
+  <ParamField path="list" type="object" required>
+    Record of hasher configurations or config providers
+  </ParamField>
+</ParamField>
+
+<ResponseField name="return" type="ConfigProvider<ResolvedConfig>">
+  A configuration provider that lazily imports and resolves hash drivers
+</ResponseField>
+
+```typescript
+import { defineConfig, drivers } from '@adonisjs/core/hash'
+
+const hashConfig = defineConfig({
+  default: 'scrypt',
+  list: {
+    scrypt: drivers.scrypt({
+      cost: 16384,
+      blockSize: 8,
+      parallelization: 1,
+      saltSize: 16,
+      keyLength: 64,
+    }),
+    bcrypt: drivers.bcrypt({
+      rounds: 10,
+    })
+  }
+})
+```
+
+## Drivers
+
+The `drivers` object provides factory functions for creating hash driver configurations.
+
+### drivers.scrypt
+
+Creates a Scrypt hash driver configuration.
+
+<ParamField path="config" type="ScryptConfig" required>
+  Scrypt algorithm configuration options
+  
+  <ParamField path="cost" type="number" default="16384">
+    CPU/memory cost parameter (N)
+  </ParamField>
+  
+  <ParamField path="blockSize" type="number" default="8">
+    Block size parameter (r)
+  </ParamField>
+  
+  <ParamField path="parallelization" type="number" default="1">
+    Parallelization parameter (p)
+  </ParamField>
+  
+  <ParamField path="saltSize" type="number" default="16">
+    Salt size in bytes
+  </ParamField>
+  
+  <ParamField path="keyLength" type="number" default="64">
+    Desired key length in bytes
+  </ParamField>
+</ParamField>
+
+```typescript
+scrypt: drivers.scrypt({
+  cost: 16384,
+  blockSize: 8,
+  parallelization: 1,
+  saltSize: 16,
+  keyLength: 64
+})
+```
+
+### drivers.bcrypt
+
+Creates a Bcrypt hash driver configuration.
+
+<ParamField path="config" type="BcryptConfig" required>
+  Bcrypt algorithm configuration options
+  
+  <ParamField path="rounds" type="number" default="10">
+    Number of rounds for key derivation. Higher values = slower but more secure.
+  </ParamField>
+</ParamField>
+
+<Note>
+Bcrypt requires the `bcrypt` peer dependency to be installed: `npm install bcrypt`
+</Note>
+
+```typescript
+bcrypt: drivers.bcrypt({
+  rounds: 12
+})
+```
+
+### drivers.argon2
+
+Creates an Argon2 hash driver configuration.
+
+<ParamField path="config" type="ArgonConfig" required>
+  Argon2 algorithm configuration options
+  
+  <ParamField path="variant" type="string" default="id">
+    Argon2 variant: 'i', 'd', or 'id'
+  </ParamField>
+  
+  <ParamField path="memory" type="number" default="65536">
+    Memory size in KB
+  </ParamField>
+  
+  <ParamField path="time" type="number" default="3">
+    Number of iterations
+  </ParamField>
+  
+  <ParamField path="parallelism" type="number" default="4">
+    Degree of parallelism
+  </ParamField>
+</ParamField>
+
+<Note>
+Argon2 requires the `argon2` peer dependency to be installed: `npm install argon2`
+</Note>
+
+```typescript
+argon2: drivers.argon2({
+  variant: 'id',
+  memory: 65536,
+  time: 3,
+  parallelism: 4
+})
+```
+
+## Hash Service
+
+The hash service is available via dependency injection and provides methods for hashing and verifying passwords.
+
+### Methods
+
+#### make
+
+Hashes a plain text password.
+
+<ParamField path="value" type="string" required>
+  The plain text password to hash
+</ParamField>
+
+<ResponseField name="return" type="Promise<string>">
+  A promise that resolves to the hashed password string
+</ResponseField>
+
+```typescript
+import hash from '@adonisjs/core/services/hash'
+
+const hashedPassword = await hash.make('user-password')
+// Returns: $scrypt$n=16384,r=8,p=1$...
+```
+
+#### verify
+
+Verifies a plain text password against a hashed value.
+
+<ParamField path="hashedValue" type="string" required>
+  The hashed password to verify against
+</ParamField>
+
+<ParamField path="plainValue" type="string" required>
+  The plain text password to verify
+</ParamField>
+
+<ResponseField name="return" type="Promise<boolean>">
+  A promise that resolves to true if the password matches, false otherwise
+</ResponseField>
+
+```typescript
+import hash from '@adonisjs/core/services/hash'
+
+const isValid = await hash.verify(hashedPassword, 'user-password')
+if (isValid) {
+  console.log('Password is correct')
+}
+```
+
+#### needsReHash
+
+Checks if a hashed value needs to be rehashed (e.g., if the algorithm parameters have changed).
+
+<ParamField path="hashedValue" type="string" required>
+  The hashed password to check
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if the hash needs to be regenerated
+</ResponseField>
+
+```typescript
+import hash from '@adonisjs/core/services/hash'
+
+if (hash.needsReHash(user.password)) {
+  user.password = await hash.make(plainPassword)
+  await user.save()
+}
+```
+
+#### use
+
+Returns a specific hash driver instance.
+
+<ParamField path="driver" type="string">
+  Optional driver name. If omitted, returns the default driver.
+</ParamField>
+
+<ResponseField name="return" type="HashDriver">
+  The hash driver instance
+</ResponseField>
+
+```typescript
+import hash from '@adonisjs/core/services/hash'
+
+// Use default driver
+const defaultHasher = hash.use()
+
+// Use specific driver
+const bcryptHasher = hash.use('bcrypt')
+const hashed = await bcryptHasher.make('password')
+```
+
+## Types
+
+### HashConfig
+
+Configuration type for the hash service.
+
+```typescript
+type HashConfig = {
+  default?: string
+  list: Record<string, ManagerDriverFactory | ConfigProvider<ManagerDriverFactory>>
+}
+```
+
+### ScryptConfig
+
+Configuration options for the Scrypt driver.
+
+```typescript
+type ScryptConfig = {
+  cost?: number
+  blockSize?: number
+  parallelization?: number
+  saltSize?: number
+  keyLength?: number
+}
+```
+
+### BcryptConfig
+
+Configuration options for the Bcrypt driver.
+
+```typescript
+type BcryptConfig = {
+  rounds?: number
+}
+```
+
+### ArgonConfig
+
+Configuration options for the Argon2 driver.
+
+```typescript
+type ArgonConfig = {
+  variant?: 'i' | 'd' | 'id'
+  memory?: number
+  time?: number
+  parallelism?: number
+}
+```
+
+## Example Usage
+
+### Configuration
+
+```typescript
+// config/hash.ts
+import { defineConfig, drivers } from '@adonisjs/core/hash'
+import env from '@adonisjs/core/services/env'
+
+export default defineConfig({
+  default: env.get('HASH_DRIVER', 'scrypt'),
+  
+  list: {
+    scrypt: drivers.scrypt({
+      cost: 16384,
+      blockSize: 8,
+      parallelization: 1,
+      saltSize: 16,
+      keyLength: 64
+    }),
+    
+    bcrypt: drivers.bcrypt({
+      rounds: 10
+    }),
+    
+    argon2: drivers.argon2({
+      variant: 'id',
+      memory: 65536,
+      time: 3,
+      parallelism: 4
+    })
+  }
+})
+```
+
+### User Authentication
+
+```typescript
+import hash from '@adonisjs/core/services/hash'
+import User from '#models/user'
+
+class AuthController {
+  async register({ request, response }: HttpContext) {
+    const data = request.only(['email', 'password'])
+    
+    // Hash the password
+    const hashedPassword = await hash.make(data.password)
+    
+    const user = await User.create({
+      email: data.email,
+      password: hashedPassword
+    })
+    
+    return response.json(user)
+  }
+  
+  async login({ request, response }: HttpContext) {
+    const { email, password } = request.only(['email', 'password'])
+    const user = await User.findByOrFail('email', email)
+    
+    // Verify the password
+    const isValid = await hash.verify(user.password, password)
+    
+    if (!isValid) {
+      return response.unauthorized({ message: 'Invalid credentials' })
+    }
+    
+    // Check if password needs rehashing
+    if (hash.needsReHash(user.password)) {
+      user.password = await hash.make(password)
+      await user.save()
+    }
+    
+    // Generate token and return
+    const token = await generateAuthToken(user)
+    return response.json({ token })
+  }
+}
+```
+
+### Using Different Drivers
+
+```typescript
+import hash from '@adonisjs/core/services/hash'
+
+// Use default driver (from config)
+const hashed1 = await hash.make('password')
+
+// Use specific driver
+const bcryptHasher = hash.use('bcrypt')
+const hashed2 = await bcryptHasher.make('password')
+
+const argonHasher = hash.use('argon2')
+const hashed3 = await argonHasher.make('password')
+
+// Verify works with any driver automatically
+const isValid = await hash.verify(hashed2, 'password') // true
+```
+
+## Notes
+
+- Import happens when you first use the hash module
+- Driver construction happens when you first use a specific driver
+- Scrypt is the recommended default driver as it doesn't require additional dependencies
+- Bcrypt and Argon2 require peer dependencies to be installed
+- Always verify passwords using the `verify` method, never compare hashes directly
+- Use `needsReHash` to upgrade hashes when configuration changes
+- Higher cost parameters = slower hashing but better security

@@ -1,0 +1,478 @@
+---
+title: Request Validation
+description: Validate HTTP request data in AdonisJS using VineJS validators for type-safe and secure data handling
+---
+
+AdonisJS uses [VineJS](https://vinejs.dev) for request validation, providing a type-safe and expressive way to validate incoming HTTP request data.
+
+## Basic validation
+
+Validate request data using the `request.validateUsing()` method:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+import vine from '@vinejs/vine'
+
+// Define a validator
+const createUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+    name: vine.string().minLength(3),
+    password: vine.string().minLength(8)
+  })
+)
+
+// Use in route handler
+router.post('/users', async ({ request }) => {
+  const data = await request.validateUsing(createUserValidator)
+  
+  // data is now typed as { email: string, name: string, password: string }
+  const user = await User.create(data)
+  return { user }
+})
+```
+
+## RequestValidator class
+
+The `RequestValidator` class from `modules/http/request_validator.ts:34` integrates VineJS with AdonisJS requests:
+
+```typescript
+import { RequestValidator } from '@adonisjs/core/http'
+
+/**
+ * The RequestValidator provides:
+ * - Automatic validation of request body, files, URL parameters, headers, and cookies
+ * - Custom error reporters per request
+ * - Custom message providers per request
+ */
+```
+
+## Validation data
+
+By default, `request.validateUsing()` validates:
+
+- Request body
+- Uploaded files
+- URL parameters (available as `params`)
+- Request headers (available as `headers`)
+- Cookies (available as `cookies`)
+
+### Validating request body
+
+```typescript
+const updateUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().optional(),
+    name: vine.string().minLength(3).optional(),
+    bio: vine.string().maxLength(500).optional()
+  })
+)
+
+router.patch('/users/:id', async ({ request }) => {
+  const data = await request.validateUsing(updateUserValidator)
+  // Only includes fields from request body
+})
+```
+
+### Validating URL parameters
+
+```typescript
+const showUserValidator = vine.compile(
+  vine.object({
+    params: vine.object({
+      id: vine.number()
+    })
+  })
+)
+
+router.get('/users/:id', async ({ request }) => {
+  const { params } = await request.validateUsing(showUserValidator)
+  // params.id is now a number
+})
+```
+
+### Validating headers
+
+```typescript
+const apiRequestValidator = vine.compile(
+  vine.object({
+    headers: vine.object({
+      'api-key': vine.string(),
+      'accept': vine.string()
+    })
+  })
+)
+
+router.post('/api/data', async ({ request }) => {
+  const { headers } = await request.validateUsing(apiRequestValidator)
+  // headers are validated
+})
+```
+
+### Validating cookies
+
+```typescript
+const cookieValidator = vine.compile(
+  vine.object({
+    cookies: vine.object({
+      session_id: vine.string()
+    })
+  })
+)
+
+router.get('/dashboard', async ({ request }) => {
+  const { cookies } = await request.validateUsing(cookieValidator)
+  // cookies.session_id is validated
+})
+```
+
+## Custom validation data
+
+Provide custom data to validate:
+
+```typescript
+router.post('/users', async ({ request }) => {
+  const customData = {
+    email: 'user@example.com',
+    name: 'John Doe'
+  }
+  
+  const data = await request.validateUsing(createUserValidator, {
+    data: customData
+  })
+})
+```
+
+## Error handling
+
+Validation errors throw a `ValidationError`:
+
+```typescript
+import { errors as vineErrors } from '@vinejs/vine'
+
+router.post('/users', async ({ request, response }) => {
+  try {
+    const data = await request.validateUsing(createUserValidator)
+    const user = await User.create(data)
+    return { user }
+  } catch (error) {
+    if (error instanceof vineErrors.E_VALIDATION_ERROR) {
+      return response.badRequest({
+        errors: error.messages
+      })
+    }
+    throw error
+  }
+})
+```
+
+## Try validation
+
+Use `tryValidateUsing()` for validation without throwing errors:
+
+```typescript
+router.post('/users', async ({ request, response }) => {
+  const [error, data] = await request.tryValidateUsing(createUserValidator)
+  
+  if (error) {
+    return response.badRequest({
+      errors: error.messages
+    })
+  }
+  
+  const user = await User.create(data)
+  return { user }
+})
+```
+
+From `modules/http/request_validator.ts:134`:
+
+```typescript
+/**
+ * Returns a tuple of [ValidationError, null] on failure
+ * or [null, ValidatedData] on success
+ */
+async tryValidateUsing<Schema, MetaData>(
+  validator: VineValidator<Schema, MetaData>,
+  options?: RequestValidationOptions<MetaData>
+): Promise<[ValidationError, null] | [null, Infer<Schema>]>
+```
+
+## Custom error reporters
+
+Customize how validation errors are reported:
+
+```typescript
+import { SimpleErrorReporter } from '@vinejs/vine'
+import { RequestValidator } from '@adonisjs/core/http'
+
+// Set global error reporter
+RequestValidator.errorReporter = ({ request }) => {
+  // Return custom error reporter based on request
+  if (request.accepts(['json'])) {
+    return new SimpleErrorReporter()
+  }
+  return new SimpleErrorReporter()
+}
+```
+
+### Per-request error reporter
+
+```typescript
+import { SimpleErrorReporter } from '@vinejs/vine'
+
+router.post('/users', async ({ request }) => {
+  const data = await request.validateUsing(createUserValidator, {
+    errorReporter: () => new SimpleErrorReporter()
+  })
+})
+```
+
+## Custom messages
+
+Provide custom validation messages:
+
+```typescript
+import { SimpleMessagesProvider } from '@vinejs/vine'
+import { RequestValidator } from '@adonisjs/core/http'
+
+// Set global messages provider
+RequestValidator.messagesProvider = () => {
+  return new SimpleMessagesProvider({
+    required: 'The {{ field }} field is required',
+    'email.email': 'Please provide a valid email address',
+    'password.minLength': 'Password must be at least {{ min }} characters'
+  })
+}
+```
+
+### Per-request messages
+
+```typescript
+import { SimpleMessagesProvider } from '@vinejs/vine'
+
+const customMessages = new SimpleMessagesProvider({
+  required: 'This field cannot be empty',
+  'email.email': 'Invalid email format'
+})
+
+router.post('/users', async ({ request }) => {
+  const data = await request.validateUsing(createUserValidator, {
+    messagesProvider: customMessages
+  })
+})
+```
+
+## Validation metadata
+
+Pass metadata to validators for dynamic validation:
+
+```typescript
+const createUserValidator = vine.withMetaData<{ disallowUserNames: string[] }>().compile(
+  vine.object({
+    username: vine.string().notIn((field) => {
+      return field.meta.disallowUserNames
+    })
+  })
+)
+
+router.post('/users', async ({ request }) => {
+  const data = await request.validateUsing(createUserValidator, {
+    meta: {
+      disallowUserNames: ['admin', 'root', 'system']
+    }
+  })
+})
+```
+
+## Creating validators
+
+### Inline validators
+
+```typescript
+router.post('/posts', async ({ request }) => {
+  const data = await request.validateUsing(
+    vine.compile(
+      vine.object({
+        title: vine.string().minLength(5),
+        content: vine.string(),
+        published: vine.boolean()
+      })
+    )
+  )
+})
+```
+
+### Reusable validators
+
+Create validators in separate files:
+
+```typescript
+// app/validators/user.ts
+import vine from '@vinejs/vine'
+
+export const createUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email(),
+    name: vine.string().minLength(3),
+    password: vine.string().minLength(8)
+  })
+)
+
+export const updateUserValidator = vine.compile(
+  vine.object({
+    email: vine.string().email().optional(),
+    name: vine.string().minLength(3).optional(),
+    bio: vine.string().maxLength(500).optional()
+  })
+)
+```
+
+Use in controllers:
+
+```typescript
+import { createUserValidator, updateUserValidator } from '#validators/user'
+
+export default class UsersController {
+  async store({ request }: HttpContext) {
+    const data = await request.validateUsing(createUserValidator)
+    const user = await User.create(data)
+    return { user }
+  }
+  
+  async update({ request, params }: HttpContext) {
+    const data = await request.validateUsing(updateUserValidator)
+    const user = await User.findOrFail(params.id)
+    await user.merge(data).save()
+    return { user }
+  }
+}
+```
+
+## Common validation rules
+
+### String validation
+
+```typescript
+vine.object({
+  email: vine.string().email(),
+  url: vine.string().url(),
+  username: vine.string().minLength(3).maxLength(20),
+  bio: vine.string().maxLength(500).optional(),
+  role: vine.enum(['admin', 'user', 'moderator'])
+})
+```
+
+### Number validation
+
+```typescript
+vine.object({
+  age: vine.number().min(18).max(100),
+  price: vine.number().positive(),
+  quantity: vine.number().min(1),
+  rating: vine.number().min(1).max(5).optional()
+})
+```
+
+### Boolean validation
+
+```typescript
+vine.object({
+  isPublished: vine.boolean(),
+  acceptTerms: vine.boolean().isTrue() // Must be true
+})
+```
+
+### Array validation
+
+```typescript
+vine.object({
+  tags: vine.array(vine.string()).minLength(1).maxLength(5),
+  ids: vine.array(vine.number()),
+  roles: vine.array(vine.enum(['admin', 'user']))
+})
+```
+
+### Object validation
+
+```typescript
+vine.object({
+  profile: vine.object({
+    firstName: vine.string(),
+    lastName: vine.string(),
+    age: vine.number().optional()
+  })
+})
+```
+
+### File validation
+
+```typescript
+vine.object({
+  avatar: vine.file({
+    size: '2mb',
+    extnames: ['jpg', 'png', 'jpeg']
+  }),
+  documents: vine.array(
+    vine.file({
+      size: '5mb',
+      extnames: ['pdf', 'doc', 'docx']
+    })
+  ).optional()
+})
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Always validate user input">
+    Never trust user input. Always validate data before processing:
+    
+    ```typescript
+    const data = await request.validateUsing(validator)
+    // Now data is validated and type-safe
+    ```
+  </Accordion>
+  
+  <Accordion title="Create reusable validators">
+    Store validators in a dedicated directory for reuse:
+    
+    ```
+    app/
+    └── validators/
+        ├── user.ts
+        ├── post.ts
+        └── comment.ts
+    ```
+  </Accordion>
+  
+  <Accordion title="Use TypeScript for type safety">
+    VineJS validators provide full TypeScript support:
+    
+    ```typescript
+    const data = await request.validateUsing(createUserValidator)
+    // data is typed as { email: string, name: string, password: string }
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle validation errors gracefully">
+    Provide clear error messages to users:
+    
+    ```typescript
+    const [error, data] = await request.tryValidateUsing(validator)
+    
+    if (error) {
+      return response.badRequest({
+        message: 'Validation failed',
+        errors: error.messages
+      })
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Further reading
+
+<Card title="VineJS Documentation" icon="book" href="https://vinejs.dev">
+  Learn more about VineJS validation rules and features
+</Card>

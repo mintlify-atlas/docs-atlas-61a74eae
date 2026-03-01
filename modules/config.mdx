@@ -1,0 +1,138 @@
+---
+title: Config
+description: Configuration management API for AdonisJS applications
+---
+
+The Config module re-exports all functionality from `@adonisjs/config`, providing a centralized configuration management system for your AdonisJS application.
+
+## Import
+
+```typescript
+import { Config } from '@adonisjs/core/config'
+import type { ConfigProvider } from '@adonisjs/core/config'
+```
+
+## Overview
+
+The Config module provides classes and utilities for managing application configuration files and environment-specific settings. It allows you to organize configuration data, access nested values, and manage different configurations for different environments.
+
+## Classes
+
+### Config
+
+The main configuration class for managing application settings.
+
+#### Constructor
+
+<ParamField path="config" type="object" default="{}">
+  Initial configuration object with key-value pairs
+</ParamField>
+
+#### Methods
+
+##### set
+
+Sets a configuration value using dot notation.
+
+<ParamField path="key" type="string" required>
+  The configuration key in dot notation (e.g., 'database.connection')
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  The value to set for the configuration key
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value
+</ResponseField>
+
+```typescript
+const config = new Config()
+config.set('database.connection', 'mysql')
+config.set('app.name', 'My Application')
+```
+
+##### get
+
+Retrieves a configuration value using dot notation.
+
+<ParamField path="key" type="string" required>
+  The configuration key in dot notation
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Optional default value to return if the key doesn't exist
+</ParamField>
+
+<ResponseField name="return" type="any">
+  The configuration value or default value if not found
+</ResponseField>
+
+```typescript
+const config = new Config()
+const dbConnection = config.get('database.connection')
+const appName = config.get('app.name', 'Default App')
+```
+
+##### has
+
+Checks if a configuration key exists.
+
+<ParamField path="key" type="string" required>
+  The configuration key to check
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns true if the key exists, false otherwise
+</ResponseField>
+
+```typescript
+const config = new Config()
+if (config.has('database.connection')) {
+  console.log('Database connection is configured')
+}
+```
+
+## Types
+
+### ConfigProvider
+
+A provider type for lazy-loading configuration values.
+
+```typescript
+type ConfigProvider<T> = {
+  resolver: (app: Application) => Promise<T>
+}
+```
+
+## Example Usage
+
+```typescript
+import { Config } from '@adonisjs/core/config'
+
+// Create a new config instance
+const config = new Config()
+
+// Set configuration values
+config.set('database.connection', 'mysql')
+config.set('database.host', 'localhost')
+config.set('database.port', 3306)
+
+// Get configuration values
+const connection = config.get('database.connection')
+const host = config.get('database.host')
+
+// Get with default value
+const timeout = config.get('database.timeout', 5000)
+
+// Check if key exists
+if (config.has('database.ssl')) {
+  const ssl = config.get('database.ssl')
+}
+```
+
+## Notes
+
+- Configuration keys use dot notation for accessing nested values
+- The Config class is typically instantiated by the AdonisJS framework and available via dependency injection
+- Configuration files are usually stored in the `config/` directory of your application

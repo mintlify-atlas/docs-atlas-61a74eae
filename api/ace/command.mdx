@@ -1,0 +1,381 @@
+---
+title: BaseCommand
+description: API reference for the BaseCommand class used to create custom CLI commands in AdonisJS applications
+---
+
+# BaseCommand
+
+The base command class for creating custom Ace commands in AdonisJS applications. This class extends the base Ace command with AdonisJS-specific functionality like dependency injection and application lifecycle management.
+
+## Import
+
+```typescript
+import { BaseCommand } from '@adonisjs/core/ace'
+```
+
+## Basic Usage
+
+```typescript
+export default class MakeUser extends BaseCommand {
+  static commandName = 'make:user'
+  static description = 'Create a new user'
+
+  async run() {
+    this.logger.info('Creating user...')
+    // Command implementation
+  }
+}
+```
+
+## Static Properties
+
+<ParamField path="commandName" type="string" required>
+  The unique name of the command used to invoke it from CLI
+</ParamField>
+
+<ParamField path="description" type="string">
+  A brief description of what the command does
+</ParamField>
+
+<ParamField path="options" type="CommandOptions">
+  Configuration options for the command:
+  
+  - `startApp?: boolean` - Whether to start the application before running the command
+  - `staysAlive?: boolean` - Whether the command keeps the process alive after execution
+</ParamField>
+
+```typescript
+export default class ServeCommand extends BaseCommand {
+  static commandName = 'serve'
+  static description = 'Start the HTTP server'
+  static options = {
+    startApp: true,
+    staysAlive: true
+  }
+}
+```
+
+## Constructor
+
+<ParamField path="app" type="ApplicationService" required>
+  The AdonisJS application instance
+</ParamField>
+
+<ParamField path="kernel" type="Kernel" required>
+  The Ace kernel instance
+</ParamField>
+
+<ParamField path="parsed" type="ParsedOutput" required>
+  Parsed command line output containing args and flags
+</ParamField>
+
+<ParamField path="ui" type="UIPrimitives" required>
+  UI primitives for rendering output
+</ParamField>
+
+<ParamField path="prompt" type="Kernel['prompt']" required>
+  Prompt utilities for user interaction
+</ParamField>
+
+## Instance Properties
+
+<ParamField path="app" type="ApplicationService">
+  Reference to the AdonisJS application instance
+</ParamField>
+
+<ParamField path="kernel" type="Kernel">
+  Reference to the Ace kernel instance
+</ParamField>
+
+<ParamField path="logger" type="Logger">
+  Logger instance for outputting messages to the console
+</ParamField>
+
+<ParamField path="ui" type="UIPrimitives">
+  UI primitives inherited from base Ace command
+</ParamField>
+
+<ParamField path="prompt" type="Prompt">
+  Prompt utilities for interactive user input
+</ParamField>
+
+<ParamField path="exitCode" type="number">
+  The exit code to return when the command completes (0 for success, 1 for error)
+</ParamField>
+
+<ParamField path="error" type="Error | undefined">
+  Error object if the command execution failed
+</ParamField>
+
+<ParamField path="result" type="any">
+  The result value returned from the run method
+</ParamField>
+
+<ParamField path="staysAlive" type="boolean">
+  Returns true if the command is configured to keep the process alive
+</ParamField>
+
+<ParamField path="startApp" type="boolean">
+  Returns true if the command is configured to start the application
+</ParamField>
+
+## Methods
+
+### run()
+
+The main method that contains the command logic. Must be implemented by subclasses.
+
+**Returns:** `Promise<any>`
+
+```typescript
+export default class MakeUser extends BaseCommand {
+  static commandName = 'make:user'
+
+  async run() {
+    this.logger.info('Creating user...')
+    // Implementation here
+  }
+}
+```
+
+### createCodemods()
+
+Creates the codemods module to modify source files programmatically. This method provides access to AST-based code transformations.
+
+**Returns:** `Promise<Codemods>`
+
+```typescript
+const codemods = await this.createCodemods()
+await codemods.makeUsingStub(stubsRoot, 'controller.stub', {
+  filename: 'UserController',
+  entity: { name: 'User' }
+})
+```
+
+### terminate()
+
+Terminate the application gracefully. This method should be preferred over calling `app.terminate()` directly as it only triggers termination when the current command is the main command responsible for the process.
+
+**Returns:** `Promise<void>`
+
+```typescript
+export default class SomeCommand extends BaseCommand {
+  async run() {
+    // Do some work
+    await this.terminate()
+  }
+}
+```
+
+### exec()
+
+Executes the lifecycle hooks and the run method from the command. This method is called internally by the kernel.
+
+**Returns:** `Promise<any>`
+
+#### Lifecycle
+
+1. Calls `prepare()` if defined
+2. Calls `interact()` if defined
+3. Calls `run()` (required)
+4. Calls `completed()` if defined
+5. Handles errors and sets exit codes
+
+## Lifecycle Hooks
+
+### prepare()
+
+The prepare template method is used to prepare the state for the command. This is the first method executed on a given command instance.
+
+**Returns:** `Promise<any> | any`
+
+```typescript
+export default class MakeUser extends BaseCommand {
+  async prepare() {
+    // Validate environment
+    // Setup initial state
+  }
+
+  async run() {
+    // Run command logic
+  }
+}
+```
+
+### interact()
+
+The interact template method is used to display prompts to the user. The method is called after the prepare method.
+
+**Returns:** `Promise<any> | any`
+
+```typescript
+export default class MakeUser extends BaseCommand {
+  declare name: string
+
+  async interact() {
+    if (!this.name) {
+      this.name = await this.prompt.ask('Enter user name')
+    }
+  }
+
+  async run() {
+    this.logger.info(`Creating user: ${this.name}`)
+  }
+}
+```
+
+### completed()
+
+The completed method is invoked after the command finishes or results in an error. You can access the command error using the `this.error` property.
+
+**Returns:** `Promise<boolean | void> | boolean | void`
+
+Returning `true` from completed method suppresses the error reporting to the kernel layer.
+
+```typescript
+export default class MakeUser extends BaseCommand {
+  async run() {
+    // Command logic
+  }
+
+  async completed() {
+    if (this.error) {
+      this.logger.error('Command failed')
+      // Return true to suppress default error handling
+      return true
+    }
+    
+    this.logger.success('Command completed successfully')
+  }
+}
+```
+
+## Decorators
+
+### @args
+
+Define positional arguments for the command.
+
+```typescript
+import { BaseCommand, args } from '@adonisjs/core/ace'
+
+export default class MakeUser extends BaseCommand {
+  static commandName = 'make:user'
+
+  @args.string({ description: 'Name of the user' })
+  declare name: string
+
+  async run() {
+    this.logger.info(`Creating user: ${this.name}`)
+  }
+}
+```
+
+#### Argument Types
+
+- `@args.string()` - String argument
+- `@args.spread()` - Spread argument (captures remaining arguments)
+
+### @flags
+
+Define optional flags for the command.
+
+```typescript
+import { BaseCommand, flags } from '@adonisjs/core/ace'
+
+export default class MakeUser extends BaseCommand {
+  static commandName = 'make:user'
+
+  @flags.boolean({ description: 'Create admin user' })
+  declare admin: boolean
+
+  @flags.string({ description: 'User email address' })
+  declare email: string
+
+  async run() {
+    this.logger.info(`Creating ${this.admin ? 'admin' : 'regular'} user`)
+  }
+}
+```
+
+#### Flag Types
+
+- `@flags.boolean()` - Boolean flag (true/false)
+- `@flags.string()` - String flag
+- `@flags.number()` - Number flag
+- `@flags.array()` - Array flag (can be specified multiple times)
+
+#### Flag Options
+
+<ParamField path="description" type="string">
+  Description shown in help output
+</ParamField>
+
+<ParamField path="default" type="any">
+  Default value when flag is not provided
+</ParamField>
+
+<ParamField path="alias" type="string">
+  Short alias for the flag (e.g., '-v' for '--verbose')
+</ParamField>
+
+<ParamField path="required" type="boolean">
+  Whether the flag is required
+</ParamField>
+
+## Complete Example
+
+```typescript
+import { BaseCommand, args, flags } from '@adonisjs/core/ace'
+
+export default class MakeUser extends BaseCommand {
+  static commandName = 'make:user'
+  static description = 'Create a new user in the database'
+  static options = {
+    startApp: true
+  }
+
+  @args.string({ description: 'Name of the user' })
+  declare name: string
+
+  @flags.string({ description: 'Email address' })
+  declare email?: string
+
+  @flags.boolean({ description: 'Create as admin', alias: 'a' })
+  declare admin: boolean
+
+  async prepare() {
+    this.logger.info('Preparing to create user...')
+  }
+
+  async interact() {
+    if (!this.email) {
+      this.email = await this.prompt.ask('Enter email address')
+    }
+  }
+
+  async run() {
+    const User = this.app.container.make('models/user')
+    
+    const user = await User.create({
+      name: this.name,
+      email: this.email,
+      role: this.admin ? 'admin' : 'user'
+    })
+
+    this.logger.success(`Created user: ${user.email}`)
+  }
+
+  async completed() {
+    if (this.error) {
+      this.logger.error('Failed to create user')
+      return true
+    }
+  }
+}
+```
+
+## See Also
+
+- [Kernel API](/api/ace/kernel) - Manage and execute commands
+- [Codemods API](/api/ace/codemods) - Programmatically modify source files

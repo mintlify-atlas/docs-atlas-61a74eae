@@ -1,0 +1,436 @@
+---
+title: Response
+description: Send HTTP responses in various formats using the Response object in AdonisJS
+---
+
+The Response object provides methods to send responses to the client in various formats including JSON, HTML, files, redirects, and more.
+
+## Accessing the response
+
+The response object is available on the `HttpContext`:
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import router from '@adonisjs/core/services/router'
+
+router.get('/users', ({ response }: HttpContext) => {
+  return response.json({ users: [] })
+})
+```
+
+## Sending responses
+
+### Implicit responses
+
+Return data directly from route handlers:
+
+```typescript
+// Returns JSON automatically
+router.get('/users', () => {
+  return { users: [] }
+})
+
+// Returns string as HTML
+router.get('/hello', () => {
+  return 'Hello World'
+})
+
+// Returns array as JSON
+router.get('/posts', () => {
+  return [{ id: 1, title: 'Post 1' }]
+})
+```
+
+### Explicit responses
+
+Use response methods for more control:
+
+```typescript
+// JSON response
+response.json({ users: [] })
+
+// Plain text response
+response.send('Hello World')
+
+// HTML response
+response.send('<h1>Hello World</h1>')
+```
+
+## JSON responses
+
+Send JSON data to the client:
+
+```typescript
+router.get('/users', ({ response }) => {
+  return response.json({
+    users: [
+      { id: 1, name: 'John' },
+      { id: 2, name: 'Jane' }
+    ]
+  })
+})
+
+// With custom status code
+response.status(201).json({
+  user: { id: 1, name: 'John' }
+})
+```
+
+## Status codes
+
+Set HTTP status codes:
+
+```typescript
+// Set status code
+response.status(404).json({ error: 'Not found' })
+
+// Use helper methods
+response.ok({ data })              // 200
+response.created({ user })         // 201
+response.accepted()                // 202
+response.noContent()               // 204
+response.badRequest({ error })     // 400
+response.unauthorized({ error })   // 401
+response.forbidden({ error })      // 403
+response.notFound({ error })       // 404
+response.methodNotAllowed()        // 405
+response.conflict({ error })       // 409
+response.tooManyRequests()         // 429
+response.internalServerError()     // 500
+response.notImplemented()          // 501
+response.badGateway()              // 502
+response.serviceUnavailable()      // 503
+```
+
+### Common status code examples
+
+```typescript
+// Successful creation
+router.post('/users', async ({ request, response }) => {
+  const user = await User.create(request.all())
+  return response.created({ user })
+})
+
+// Resource not found
+router.get('/users/:id', async ({ params, response }) => {
+  const user = await User.find(params.id)
+  
+  if (!user) {
+    return response.notFound({ error: 'User not found' })
+  }
+  
+  return response.ok({ user })
+})
+
+// Validation error
+router.post('/users', async ({ request, response }) => {
+  try {
+    const data = await request.validateUsing(validator)
+    const user = await User.create(data)
+    return response.created({ user })
+  } catch (error) {
+    return response.badRequest({ errors: error.messages })
+  }
+})
+
+// Unauthorized access
+router.get('/admin', ({ auth, response }) => {
+  if (!auth.user) {
+    return response.unauthorized({ error: 'Not authenticated' })
+  }
+  
+  return response.ok({ data: 'Admin data' })
+})
+```
+
+## Response headers
+
+Set response headers:
+
+```typescript
+// Set single header
+response.header('X-Custom-Header', 'value')
+
+// Set multiple headers
+response.headers({
+  'X-Custom-Header': 'value',
+  'X-Another-Header': 'another-value'
+})
+
+// Append to existing header
+response.append('Set-Cookie', 'key=value')
+
+// Remove header
+response.removeHeader('X-Custom-Header')
+
+// Check if header exists
+if (response.hasHeader('Content-Type')) {
+  // Header exists
+}
+
+// Get header value
+const contentType = response.getHeader('Content-Type')
+```
+
+## Content type
+
+Set the response content type:
+
+```typescript
+// Set content type
+response.type('application/json')
+response.type('text/html')
+response.type('text/plain')
+
+// Use short names
+response.type('json')
+response.type('html')
+response.type('text')
+```
+
+## Cookies
+
+Set and manage response cookies:
+
+```typescript
+// Set a cookie
+response.cookie('session_id', 'abc123')
+
+// Set with options
+response.cookie('theme', 'dark', {
+  maxAge: 3600,        // 1 hour in seconds
+  httpOnly: true,      // Not accessible via JavaScript
+  secure: true,        // Only over HTTPS
+  sameSite: 'strict'   // CSRF protection
+})
+
+// Set encrypted cookie
+response.encryptedCookie('user_id', '123', {
+  maxAge: 3600
+})
+
+// Clear a cookie
+response.clearCookie('session_id')
+
+// Clear encrypted cookie
+response.clearEncryptedCookie('user_id')
+```
+
+## Redirects
+
+Redirect to a different URL:
+
+```typescript
+// Redirect to URL
+response.redirect('/login')
+
+// Redirect with status code
+response.redirect('/login', true, 301) // Permanent redirect
+
+// Redirect to previous URL
+response.redirect().back()
+
+// Redirect to route name
+response.redirect().toRoute('users.show', { id: 1 })
+
+// Redirect with query string
+response.redirect().toPath('/users', { page: 2 })
+// Redirects to: /users?page=2
+```
+
+## File downloads
+
+Send files to the client:
+
+```typescript
+// Download a file
+response.download('path/to/file.pdf')
+
+// Download with custom filename
+response.download('path/to/file.pdf', 'report.pdf')
+
+// Stream a file
+response.stream('path/to/video.mp4')
+
+// Attach a file (sets Content-Disposition header)
+response.attachment('path/to/file.pdf')
+response.attachment('path/to/file.pdf', 'custom-name.pdf')
+```
+
+## Streaming responses
+
+Stream data to the client:
+
+```typescript
+import { createReadStream } from 'node:fs'
+
+router.get('/video', ({ response }) => {
+  const stream = createReadStream('videos/movie.mp4')
+  response.stream(stream)
+})
+
+// Stream with custom content type
+router.get('/data', ({ response }) => {
+  const stream = getDataStream()
+  response.type('text/csv')
+  response.stream(stream)
+})
+```
+
+## Vary header
+
+Set the Vary header for caching:
+
+```typescript
+// Vary by single header
+response.vary('Accept-Encoding')
+
+// Vary by multiple headers
+response.vary(['Accept-Encoding', 'Accept-Language'])
+```
+
+## ETags
+
+Set ETag for caching:
+
+```typescript
+response.etag('"abc123"')
+
+// Generate ETag from response body
+response.etag(JSON.stringify(data))
+```
+
+## Aborting responses
+
+Abort a response and send immediately:
+
+```typescript
+router.get('/check', ({ response }) => {
+  const isValid = checkSomething()
+  
+  if (!isValid) {
+    // Abort and send 403 immediately
+    response.abort({ error: 'Access denied' }, 403)
+  }
+  
+  return { data: 'Success' }
+})
+```
+
+## Getting response state
+
+Check response state:
+
+```typescript
+// Check if headers have been sent
+if (response.hasHeadersSent()) {
+  // Cannot modify response anymore
+}
+
+// Get current status code
+const status = response.getStatus()
+
+// Get response body
+const body = response.getBody()
+```
+
+## Response macros
+
+Extend the Response class with custom methods:
+
+```typescript
+import { Response } from '@adonisjs/core/http'
+
+// Define a macro
+Response.macro('sendSuccess', function (data: any) {
+  return this.json({
+    success: true,
+    data
+  })
+})
+
+Response.macro('sendError', function (message: string, code = 400) {
+  return this.status(code).json({
+    success: false,
+    error: message
+  })
+})
+
+// Use in route handlers
+router.get('/users', ({ response }) => {
+  return response.sendSuccess({ users: [] })
+})
+
+router.post('/users', ({ response }) => {
+  return response.sendError('Validation failed')
+})
+```
+
+## TypeScript types
+
+Define macro types:
+
+```typescript
+declare module '@adonisjs/core/http' {
+  interface Response {
+    sendSuccess(data: any): void
+    sendError(message: string, code?: number): void
+  }
+}
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Use appropriate status codes">
+    Always use the correct HTTP status code for the response:
+    - 2xx for success
+    - 3xx for redirects
+    - 4xx for client errors
+    - 5xx for server errors
+  </Accordion>
+  
+  <Accordion title="Set proper content types">
+    Always set the correct content type for your responses:
+    
+    ```typescript
+    response.type('application/json').json({ data })
+    response.type('text/csv').send(csvData)
+    ```
+  </Accordion>
+  
+  <Accordion title="Use helper methods">
+    Use built-in helper methods instead of manually setting status codes:
+    
+    ```typescript
+    // Good
+    response.notFound({ error: 'Not found' })
+    
+    // Avoid
+    response.status(404).json({ error: 'Not found' })
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle errors consistently">
+    Use a consistent error response format across your API:
+    
+    ```typescript
+    response.badRequest({
+      error: 'Validation failed',
+      messages: validationErrors
+    })
+    ```
+  </Accordion>
+  
+  <Accordion title="Secure cookies properly">
+    Always use secure options for sensitive cookies:
+    
+    ```typescript
+    response.cookie('session', value, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict'
+    })
+    ```
+  </Accordion>
+</AccordionGroup>

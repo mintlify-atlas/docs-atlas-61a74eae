@@ -1,0 +1,410 @@
+---
+title: Codemods API
+description: Programmatically modify AdonisJS source files using the Codemods API for scaffolding and code generation
+---
+
+The Codemods API provides powerful utilities to programmatically modify AdonisJS application source files. This is primarily used in Ace commands for scaffolding, package installation, and code generation.
+
+## Overview
+
+The `Codemods` class enables you to:
+
+- Generate files from stub templates
+- Register middleware, policies, and plugins
+- Update configuration files (adonisrc.ts, vite.config.ts, etc.)
+- Install npm packages
+- Define environment variables
+- Modify TypeScript source files using AST transformations
+
+<Warning>
+The Codemods API requires `@adonisjs/assembler` to be installed as a dependency. If not available, operations will fail gracefully with warnings.
+</Warning>
+
+## Getting Started
+
+Access the Codemods instance in Ace commands:
+
+```ts
+import { BaseCommand } from '@adonisjs/core/ace'
+import { CommandOptions } from '@adonisjs/core/types/ace'
+
+export default class MakeController extends BaseCommand {
+  static commandName = 'make:controller'
+  
+  async run() {
+    const codemods = await this.createCodemods()
+    
+    // Use codemods API
+    await codemods.makeUsingStub(stubsRoot, 'controller.stub', {
+      filename: 'UserController'
+    })
+  }
+}
+```
+
+## Generating Files from Stubs
+
+Create files using stub templates with dynamic content:
+
+```ts
+const result = await codemods.makeUsingStub(
+  './stubs',
+  'controller.stub',
+  {
+    filename: 'UserController',
+    entity: { name: 'User', modelName: 'User' },
+    resourceful: true
+  }
+)
+
+if (result.status === 'created') {
+  this.logger.success(`Created ${result.relativeFileName}`)
+}
+```
+
+### Overwriting Files
+
+Control file overwrite behavior:
+
+```ts
+codemods.overwriteExisting = true
+
+await codemods.makeUsingStub(stubsRoot, 'controller.stub', {
+  filename: 'UserController'
+})
+```
+
+### Using File Contents
+
+Replace stub output with contents from an existing file:
+
+```ts
+await codemods.makeUsingStub(
+  stubsRoot,
+  'migration.stub',
+  { filename: 'create_users_table' },
+  { contentsFromFile: 'templates/base_migration.ts' }
+)
+```
+
+## Environment Variables
+
+Define environment variables in `.env` and `.env.example`:
+
+```ts
+await codemods.defineEnvVariables({
+  DB_CONNECTION: 'mysql',
+  DB_HOST: 'localhost',
+  DB_PORT: 3306,
+  DB_USER: 'root',
+  SECRET_KEY: 'abc123'
+}, {
+  omitFromExample: ['SECRET_KEY'] // Exclude secrets from .env.example
+})
+```
+
+## Environment Validation
+
+Add validation schema to `start/env.ts`:
+
+```ts
+await codemods.defineEnvValidations({
+  NODE_ENV: 'Env.schema.enum(["development", "production", "test"] as const)',
+  PORT: 'Env.schema.number()',
+  HOST: 'Env.schema.string({ format: "host" })',
+  APP_KEY: 'Env.schema.string()'
+})
+```
+
+## Middleware Registration
+
+Register middleware in `start/kernel.ts`:
+
+```ts
+// Server middleware
+await codemods.registerMiddleware('server', [
+  {
+    name: 'cors',
+    path: '@adonisjs/cors/cors_middleware'
+  }
+])
+
+// Named middleware
+await codemods.registerMiddleware('named', [
+  {
+    name: 'auth',
+    path: '#middleware/auth_middleware'
+  }
+])
+
+// Router middleware
+await codemods.registerMiddleware('router', [
+  {
+    name: 'bodyParser',
+    path: '@adonisjs/core/bodyparser_middleware'
+  }
+])
+```
+
+## Bouncer Policies
+
+Register policies in `app/policies/main.ts`:
+
+```ts
+await codemods.registerPolicies([
+  {
+    name: 'UserPolicy',
+    path: '#policies/user_policy'
+  },
+  {
+    name: 'PostPolicy',
+    path: '#policies/post_policy'
+  }
+])
+```
+
+## Package Installation
+
+Install npm packages programmatically:
+
+```ts
+const success = await codemods.installPackages([
+  { name: '@adonisjs/lucid', isDevDependency: false },
+  { name: '@adonisjs/auth', isDevDependency: false },
+  { name: '@types/node', isDevDependency: true }
+])
+
+if (success) {
+  this.logger.success('Packages installed successfully')
+}
+```
+
+### Package Manager Detection
+
+Automatic detection of npm, yarn, or pnpm:
+
+```ts
+// Force specific package manager
+await codemods.installPackages(packages, 'pnpm')
+```
+
+### Verbose Output
+
+Show installation output:
+
+```ts
+codemods.verboseInstallOutput = true
+await codemods.installPackages(packages)
+```
+
+### Manual Installation
+
+Display installation instructions instead:
+
+```ts
+await codemods.listPackagesToInstall([
+  { name: '@adonisjs/lucid', isDevDependency: false },
+  { name: '@types/node', isDevDependency: true }
+])
+
+// Output:
+// Please install following packages
+// npm i -D @types/node
+// npm i @adonisjs/lucid
+```
+
+## Updating Config Files
+
+### AdonisRC File
+
+Update `adonisrc.ts` configuration:
+
+```ts
+await codemods.updateRcFile((rcFile) => {
+  rcFile.addCommand('make:custom')
+  rcFile.addPreloadFile('#app/events/main')
+  rcFile.addProvider('@adonisjs/lucid/database_provider')
+})
+```
+
+### Vite Configuration
+
+Register Vite plugins in `vite.config.ts`:
+
+```ts
+await codemods.registerVitePlugin({
+  name: 'vue',
+  import: 'import vue from "@vitejs/plugin-vue"',
+  options: '()'
+})
+
+await codemods.registerVitePlugin({
+  name: 'react',
+  import: 'import react from "@vitejs/plugin-react"',
+  options: '({ fastRefresh: true })'
+})
+```
+
+### Japa Configuration
+
+Register Japa plugins in `tests/bootstrap.ts`:
+
+```ts
+await codemods.registerJapaPlugin({
+  name: 'expect',
+  import: 'import { expect } from "@japa/expect"'
+})
+
+await codemods.registerJapaPlugin({
+  name: 'apiClient',
+  import: 'import { apiClient } from "@japa/api-client"'
+})
+```
+
+## Advanced AST Operations
+
+### Adding Validators
+
+Create validator files:
+
+```ts
+await codemods.addValidator({
+  validatorFileName: 'create_user',
+  exportName: 'createUserValidator',
+  contents: `export const createUserValidator = vine.compile(
+    vine.object({
+      email: vine.string().email(),
+      password: vine.string().minLength(8)
+    })
+  )`
+})
+```
+
+### Adding Rate Limiters
+
+Create rate limiter definitions:
+
+```ts
+await codemods.addLimiter({
+  limiterFileName: 'api_throttle',
+  exportName: 'apiThrottleLimiter',
+  contents: `export const apiThrottleLimiter = limiter.define('api', {
+    requests: 100,
+    duration: '1 min'
+  })`
+})
+```
+
+### Model Mixins
+
+Add mixins to models:
+
+```ts
+await codemods.addModelMixins('user', [
+  {
+    name: 'SoftDeletes',
+    importPath: '@adonisjs/lucid/mixins/soft_deletes',
+    importType: 'named'
+  }
+])
+```
+
+### Controller Methods
+
+Add methods to existing controllers:
+
+```ts
+await codemods.addControllerMethod({
+  controllerFileName: 'users_controller',
+  className: 'UsersController',
+  name: 'destroy',
+  contents: `async destroy({ params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+    await user.delete()
+    return response.noContent()
+  }`,
+  imports: [
+    { isType: false, isNamed: true, name: 'HttpContext', path: '@adonisjs/core/http' }
+  ]
+})
+```
+
+## TsMorph Integration
+
+Access the TsMorph project for advanced AST manipulation:
+
+```ts
+const project = await codemods.getTsMorphProject()
+
+if (project) {
+  const sourceFile = project.getSourceFile('app/models/user.ts')
+  
+  if (sourceFile) {
+    // Add import
+    sourceFile.addImportDeclaration({
+      moduleSpecifier: '@adonisjs/lucid/orm',
+      namedImports: ['column']
+    })
+    
+    // Save changes
+    await sourceFile.save()
+  }
+}
+```
+
+## Event Handling
+
+Listen to codemod errors:
+
+```ts
+codemods.on('error', (error) => {
+  this.logger.error(`Codemod failed: ${error.message}`)
+})
+
+await codemods.registerMiddleware('server', middleware)
+```
+
+## API Reference
+
+### Constructor
+
+```ts
+const codemods = new Codemods(app, logger)
+```
+
+<ParamField path="app" type="Application" required>
+  AdonisJS application instance
+</ParamField>
+
+<ParamField path="logger" type="UIPrimitives['logger']" required>
+  CLI logger instance for output
+</ParamField>
+
+### Properties
+
+<ResponseField name="overwriteExisting" type="boolean" default="false">
+  Whether to overwrite existing files when generating from stubs
+</ResponseField>
+
+<ResponseField name="verboseInstallOutput" type="boolean" default="false">
+  Display verbose output during package installation
+</ResponseField>
+
+## Best Practices
+
+<Tip>
+Always check if the assembler is available before performing complex operations. Most methods handle missing assembler gracefully but display warnings.
+</Tip>
+
+<Note>
+When installing packages, consider providing a manual installation fallback using `listPackagesToInstall()` for better user experience.
+</Note>
+
+```ts
+const success = await codemods.installPackages(packages)
+
+if (!success) {
+  this.logger.warning('Automatic installation failed')
+  await codemods.listPackagesToInstall(packages)
+}
+```

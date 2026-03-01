@@ -1,0 +1,375 @@
+---
+title: Transformers
+description: HTTP response transformation API for formatting data
+---
+
+The Transformers module re-exports all functionality from `@adonisjs/http-transformers`, providing utilities for transforming and formatting HTTP response data.
+
+## Import
+
+```typescript
+import { Transformer } from '@adonisjs/core/transformers'
+import type { TransformerContract } from '@adonisjs/core/transformers'
+```
+
+## Overview
+
+The Transformers module provides a structured way to transform your application data before sending it as HTTP responses. This is useful for formatting API responses, hiding sensitive fields, and maintaining consistent response structures.
+
+## Classes
+
+### Transformer
+
+Base class for creating data transformers.
+
+#### Methods
+
+##### transform
+
+Transforms a single data object.
+
+<ParamField path="data" type="any" required>
+  The data object to transform
+</ParamField>
+
+<ResponseField name="return" type="object">
+  The transformed data object
+</ResponseField>
+
+```typescript
+import { Transformer } from '@adonisjs/core/transformers'
+
+class UserTransformer extends Transformer {
+  transform(user: User) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt.toISOString()
+    }
+  }
+}
+```
+
+##### collection
+
+Transforms an array of data objects.
+
+<ParamField path="data" type="any[]" required>
+  The array of data objects to transform
+</ParamField>
+
+<ResponseField name="return" type="object[]">
+  Array of transformed data objects
+</ResponseField>
+
+```typescript
+class UserTransformer extends Transformer {
+  transform(user: User) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email
+    }
+  }
+}
+
+const transformer = new UserTransformer()
+const users = await User.all()
+const transformed = transformer.collection(users)
+```
+
+##### include
+
+Includes related data in the transformation.
+
+<ParamField path="relation" type="string" required>
+  The name of the relation to include
+</ParamField>
+
+<ParamField path="data" type="any" required>
+  The related data to transform
+</ParamField>
+
+<ParamField path="transformer" type="Transformer" required>
+  The transformer to use for the related data
+</ParamField>
+
+<ResponseField name="return" type="object">
+  The transformed related data
+</ResponseField>
+
+```typescript
+class PostTransformer extends Transformer {
+  transform(post: Post) {
+    return {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      author: this.include('author', post.author, new UserTransformer())
+    }
+  }
+}
+```
+
+## Types
+
+### TransformerContract
+
+Interface for transformer implementations.
+
+```typescript
+interface TransformerContract<T = any> {
+  transform(data: T): object
+  collection(data: T[]): object[]
+}
+```
+
+## Example Usage
+
+### Basic Transformer
+
+```typescript
+// app/transformers/user_transformer.ts
+import { Transformer } from '@adonisjs/core/transformers'
+import type User from '#models/user'
+
+export default class UserTransformer extends Transformer {
+  transform(user: User) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString()
+    }
+  }
+}
+```
+
+### Using Transformers in Controllers
+
+```typescript
+// app/controllers/users_controller.ts
+import type { HttpContext } from '@adonisjs/core/http'
+import User from '#models/user'
+import UserTransformer from '#transformers/user_transformer'
+
+export default class UsersController {
+  async index({ response }: HttpContext) {
+    const users = await User.all()
+    const transformer = new UserTransformer()
+    
+    return response.json({
+      data: transformer.collection(users)
+    })
+  }
+  
+  async show({ params, response }: HttpContext) {
+    const user = await User.findOrFail(params.id)
+    const transformer = new UserTransformer()
+    
+    return response.json({
+      data: transformer.transform(user)
+    })
+  }
+}
+```
+
+### Transformer with Relations
+
+```typescript
+// app/transformers/post_transformer.ts
+import { Transformer } from '@adonisjs/core/transformers'
+import type Post from '#models/post'
+import UserTransformer from '#transformers/user_transformer'
+import CommentTransformer from '#transformers/comment_transformer'
+
+export default class PostTransformer extends Transformer {
+  transform(post: Post) {
+    return {
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      content: post.content,
+      publishedAt: post.publishedAt?.toISOString(),
+      author: post.author 
+        ? this.include('author', post.author, new UserTransformer())
+        : null,
+      comments: post.comments
+        ? this.include('comments', post.comments, new CommentTransformer())
+        : []
+    }
+  }
+}
+```
+
+### Hiding Sensitive Data
+
+```typescript
+// app/transformers/admin_user_transformer.ts
+import { Transformer } from '@adonisjs/core/transformers'
+import type User from '#models/user'
+
+export default class AdminUserTransformer extends Transformer {
+  transform(user: User) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      // Exclude sensitive fields like password, apiToken, etc.
+      lastLoginAt: user.lastLoginAt?.toISOString(),
+      createdAt: user.createdAt.toISOString()
+    }
+  }
+}
+
+// app/transformers/public_user_transformer.ts
+export default class PublicUserTransformer extends Transformer {
+  transform(user: User) {
+    return {
+      id: user.id,
+      name: user.name,
+      // Hide email and other details from public
+      avatar: user.avatar
+    }
+  }
+}
+```
+
+### Conditional Fields
+
+```typescript
+import { Transformer } from '@adonisjs/core/transformers'
+import type User from '#models/user'
+
+export default class UserTransformer extends Transformer {
+  constructor(private includeEmail: boolean = false) {
+    super()
+  }
+  
+  transform(user: User) {
+    const data: any = {
+      id: user.id,
+      name: user.name,
+      avatar: user.avatar
+    }
+    
+    // Conditionally include email
+    if (this.includeEmail) {
+      data.email = user.email
+    }
+    
+    return data
+  }
+}
+
+// Usage
+const transformer = new UserTransformer(true) // Include email
+const transformed = transformer.transform(user)
+```
+
+### Paginated Response
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import User from '#models/user'
+import UserTransformer from '#transformers/user_transformer'
+
+export default class UsersController {
+  async index({ request, response }: HttpContext) {
+    const page = request.input('page', 1)
+    const limit = request.input('limit', 20)
+    
+    const users = await User.query().paginate(page, limit)
+    const transformer = new UserTransformer()
+    
+    return response.json({
+      data: transformer.collection(users.all()),
+      meta: {
+        total: users.total,
+        perPage: users.perPage,
+        currentPage: users.currentPage,
+        lastPage: users.lastPage
+      }
+    })
+  }
+}
+```
+
+### Nested Transformations
+
+```typescript
+// app/transformers/order_transformer.ts
+import { Transformer } from '@adonisjs/core/transformers'
+import type Order from '#models/order'
+import UserTransformer from '#transformers/user_transformer'
+import ProductTransformer from '#transformers/product_transformer'
+
+export default class OrderTransformer extends Transformer {
+  transform(order: Order) {
+    return {
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      total: order.total,
+      currency: order.currency,
+      customer: order.customer
+        ? this.include('customer', order.customer, new UserTransformer())
+        : null,
+      items: order.items
+        ? order.items.map(item => ({
+            id: item.id,
+            quantity: item.quantity,
+            price: item.price,
+            product: this.include('product', item.product, new ProductTransformer())
+          }))
+        : [],
+      createdAt: order.createdAt.toISOString()
+    }
+  }
+}
+```
+
+### Computed Fields
+
+```typescript
+import { Transformer } from '@adonisjs/core/transformers'
+import type Post from '#models/post'
+
+export default class PostTransformer extends Transformer {
+  transform(post: Post) {
+    return {
+      id: post.id,
+      title: post.title,
+      content: post.content,
+      // Computed fields
+      readingTime: this.calculateReadingTime(post.content),
+      wordCount: post.content.split(' ').length,
+      isPublished: post.publishedAt !== null,
+      url: `/posts/${post.slug}`,
+      publishedAt: post.publishedAt?.toISOString()
+    }
+  }
+  
+  private calculateReadingTime(content: string): number {
+    const wordsPerMinute = 200
+    const wordCount = content.split(' ').length
+    return Math.ceil(wordCount / wordsPerMinute)
+  }
+}
+```
+
+## Notes
+
+- Transformers help maintain consistent API response formats
+- They provide a single place to define how data should be formatted
+- Use transformers to hide sensitive fields and control data exposure
+- Transformers are reusable across different controllers and endpoints
+- They make it easy to version your API by creating different transformer versions
+- Consider creating separate transformers for different user roles or contexts
+- Transformers can include computed fields and format dates consistently
+- They work well with paginated responses and collections

@@ -1,0 +1,280 @@
+---
+title: Events
+description: Event emitter API for building event-driven applications
+---
+
+The Events module re-exports all functionality from `@adonisjs/events`, providing a type-safe event emitter for building event-driven applications.
+
+## Import
+
+```typescript
+import { Emitter } from '@adonisjs/core/events'
+import type { EventsList } from '@adonisjs/core/events'
+```
+
+## Overview
+
+The Events module provides an event emitter implementation that allows different parts of your application to communicate through events. It supports both synchronous and asynchronous event listeners with full TypeScript support.
+
+## Classes
+
+### Emitter
+
+The main event emitter class for dispatching and listening to events.
+
+#### Constructor
+
+<ParamField path="app" type="Application">
+  The AdonisJS application instance (typically injected automatically)
+</ParamField>
+
+#### Methods
+
+##### on
+
+Registers an event listener.
+
+<ParamField path="event" type="string" required>
+  The event name to listen for
+</ParamField>
+
+<ParamField path="handler" type="function" required>
+  The callback function to execute when the event is emitted. Can be synchronous or asynchronous.
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value
+</ResponseField>
+
+```typescript
+import emitter from '@adonisjs/core/services/emitter'
+
+emitter.on('user:registered', async (user) => {
+  // Send welcome email
+  await sendWelcomeEmail(user)
+})
+```
+
+##### once
+
+Registers a one-time event listener that is automatically removed after being called once.
+
+<ParamField path="event" type="string" required>
+  The event name to listen for
+</ParamField>
+
+<ParamField path="handler" type="function" required>
+  The callback function to execute when the event is emitted
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value
+</ResponseField>
+
+```typescript
+emitter.once('app:ready', () => {
+  console.log('Application is ready!')
+})
+```
+
+##### emit
+
+Emits an event with optional data.
+
+<ParamField path="event" type="string" required>
+  The event name to emit
+</ParamField>
+
+<ParamField path="data" type="any">
+  Optional data to pass to event listeners
+</ParamField>
+
+<ResponseField name="return" type="Promise<void>">
+  A promise that resolves when all listeners have finished executing
+</ResponseField>
+
+```typescript
+await emitter.emit('user:registered', {
+  id: user.id,
+  email: user.email,
+  name: user.name
+})
+```
+
+##### off
+
+Removes an event listener.
+
+<ParamField path="event" type="string" required>
+  The event name
+</ParamField>
+
+<ParamField path="handler" type="function">
+  The specific handler to remove. If omitted, removes all handlers for the event.
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value
+</ResponseField>
+
+```typescript
+const handler = (user) => console.log(user)
+emitter.on('user:registered', handler)
+
+// Later, remove the listener
+emitter.off('user:registered', handler)
+```
+
+##### clearListeners
+
+Removes all listeners for a specific event or all events.
+
+<ParamField path="event" type="string">
+  Optional event name. If omitted, clears all listeners for all events.
+</ParamField>
+
+<ResponseField name="return" type="void">
+  No return value
+</ResponseField>
+
+```typescript
+// Clear all listeners for a specific event
+emitter.clearListeners('user:registered')
+
+// Clear all listeners for all events
+emitter.clearListeners()
+```
+
+##### listenerCount
+
+Returns the number of listeners for an event.
+
+<ParamField path="event" type="string" required>
+  The event name
+</ParamField>
+
+<ResponseField name="return" type="number">
+  The number of registered listeners for the event
+</ResponseField>
+
+```typescript
+const count = emitter.listenerCount('user:registered')
+console.log(`${count} listeners registered for user:registered event`)
+```
+
+## Types
+
+### EventsList
+
+Type definition for declaring application events with their data types.
+
+```typescript
+declare module '@adonisjs/core/types' {
+  interface EventsList {
+    'user:registered': { id: number; email: string; name: string }
+    'order:placed': { orderId: string; total: number }
+    'email:sent': { to: string; subject: string }
+  }
+}
+```
+
+## Example Usage
+
+### Defining Events
+
+```typescript
+// In types/events.ts
+declare module '@adonisjs/core/types' {
+  interface EventsList {
+    'user:registered': {
+      id: number
+      email: string
+      name: string
+    }
+    'user:updated': {
+      id: number
+      changes: Record<string, any>
+    }
+    'user:deleted': {
+      id: number
+    }
+  }
+}
+```
+
+### Listening to Events
+
+```typescript
+import emitter from '@adonisjs/core/services/emitter'
+
+// Single listener
+emitter.on('user:registered', async (user) => {
+  await sendWelcomeEmail(user.email)
+})
+
+// Multiple listeners for the same event
+emitter.on('user:registered', async (user) => {
+  await createUserProfile(user.id)
+})
+
+emitter.on('user:registered', async (user) => {
+  await logUserRegistration(user)
+})
+
+// One-time listener
+emitter.once('app:ready', () => {
+  console.log('Application started successfully')
+})
+```
+
+### Emitting Events
+
+```typescript
+import emitter from '@adonisjs/core/services/emitter'
+
+class UserController {
+  async register({ request, response }: HttpContext) {
+    const user = await User.create(request.all())
+    
+    // Emit event (all listeners will be called)
+    await emitter.emit('user:registered', {
+      id: user.id,
+      email: user.email,
+      name: user.name
+    })
+    
+    return response.json(user)
+  }
+}
+```
+
+### Creating Event Listeners
+
+```typescript
+// In app/listeners/user_registered.ts
+import emitter from '@adonisjs/core/services/emitter'
+import mail from '@adonisjs/mail/services/main'
+
+class UserRegisteredListener {
+  async handle(data: { id: number; email: string; name: string }) {
+    await mail.send((message) => {
+      message
+        .to(data.email)
+        .subject('Welcome!')
+        .htmlView('emails/welcome', { name: data.name })
+    })
+  }
+}
+
+// Register the listener
+const listener = new UserRegisteredListener()
+emitter.on('user:registered', listener.handle.bind(listener))
+```
+
+## Notes
+
+- All event listeners are executed sequentially in the order they were registered
+- Async listeners are awaited, so errors in listeners can be caught
+- TypeScript provides autocomplete for event names and data types when properly declared
+- The emitter instance is typically available via the `@adonisjs/core/services/emitter` service
+- Events are a great way to decouple different parts of your application

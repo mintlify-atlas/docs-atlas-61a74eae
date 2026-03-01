@@ -1,0 +1,371 @@
+---
+title: Application
+description: API reference for the Application class that manages the AdonisJS application lifecycle, container, and environment
+---
+
+The `Application` class is the core of an AdonisJS application. It manages the application lifecycle, service providers, container bindings, and configuration. This module re-exports all functionality from `@adonisjs/application`.
+
+## Import
+
+```typescript
+import { Application } from '@adonisjs/core/app'
+import type { ApplicationService } from '@adonisjs/core/types'
+```
+
+## ApplicationService Interface
+
+The `ApplicationService` is a type-safe interface that extends the `Application` class with all registered container bindings.
+
+```typescript
+interface ApplicationService extends Application<ContainerBindings> {}
+```
+
+## Key Properties
+
+### environment
+
+The current environment in which the application is running.
+
+```typescript
+app.environment // 'web' | 'console' | 'test' | 'repl'
+```
+
+<ResponseField name="environment" type="AppEnvironments">
+  Returns the current application environment.
+</ResponseField>
+
+### appRoot
+
+The root URL of the application.
+
+```typescript
+app.appRoot // URL
+```
+
+<ResponseField name="appRoot" type="URL">
+  Returns the application root as a URL object.
+</ResponseField>
+
+### container
+
+The IoC container instance for dependency injection and service resolution.
+
+```typescript
+app.container
+```
+
+<ResponseField name="container" type="Container">
+  Returns the container instance with all registered bindings.
+</ResponseField>
+
+### config
+
+The configuration store containing all application configuration.
+
+```typescript
+app.config
+```
+
+<ResponseField name="config" type="ConfigProvider">
+  Returns the configuration provider instance.
+</ResponseField>
+
+### isReady
+
+Indicates whether the application has been fully started.
+
+```typescript
+app.isReady // boolean
+```
+
+<ResponseField name="isReady" type="boolean">
+  Returns `true` if the application has completed the start phase.
+</ResponseField>
+
+### isBooted
+
+Indicates whether the application has been booted.
+
+```typescript
+app.isBooted // boolean
+```
+
+<ResponseField name="isBooted" type="boolean">
+  Returns `true` if the application has completed the boot phase.
+</ResponseField>
+
+## Lifecycle Methods
+
+### init
+
+Initializes the application by loading service providers and registering bindings.
+
+```typescript
+await app.init()
+```
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when initialization is complete.
+</ResponseField>
+
+### boot
+
+Boots all registered service providers.
+
+```typescript
+await app.boot()
+```
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when all providers have been booted.
+</ResponseField>
+
+### start
+
+Starts the application and triggers the ready hook of all providers.
+
+```typescript
+await app.start(callback)
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Callback function to execute during the start phase, after booting but before the ready hook.
+</ParamField>
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when the application is fully started.
+</ResponseField>
+
+### terminate
+
+Terminates the application gracefully by running all termination hooks.
+
+```typescript
+await app.terminate()
+```
+
+<ResponseField name="return" type="Promise<void>">
+  Returns a promise that resolves when the application has been terminated.
+</ResponseField>
+
+## Lifecycle Hooks
+
+### booting
+
+Register a callback to be executed during the booting phase.
+
+```typescript
+app.booting(async () => {
+  // Your booting logic
+})
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Callback function to execute during booting.
+</ParamField>
+
+### booted
+
+Register a callback to be executed after the application has booted.
+
+```typescript
+app.booted(async () => {
+  // Your booted logic
+})
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Callback function to execute after booting.
+</ParamField>
+
+### starting
+
+Register a callback to be executed during the starting phase.
+
+```typescript
+app.starting(async () => {
+  // Your starting logic
+})
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Callback function to execute during starting.
+</ParamField>
+
+### ready
+
+Register a callback to be executed when the application is fully ready.
+
+```typescript
+app.ready(async () => {
+  // Your ready logic
+})
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Callback function to execute when ready.
+</ParamField>
+
+### terminating
+
+Register a callback to be executed during termination.
+
+```typescript
+app.terminating(async () => {
+  // Your cleanup logic
+})
+```
+
+<ParamField path="callback" type="() => void | Promise<void>" required>
+  Callback function to execute during termination.
+</ParamField>
+
+## Environment Management
+
+### setEnvironment
+
+Sets the application environment.
+
+```typescript
+app.setEnvironment('repl')
+```
+
+<ParamField path="environment" type="AppEnvironments" required>
+  The environment to set. Valid values: `'web'`, `'console'`, `'test'`, `'repl'`.
+</ParamField>
+
+### inProduction
+
+Check if the application is running in production mode.
+
+```typescript
+if (app.inProduction) {
+  // Production-specific logic
+}
+```
+
+<ResponseField name="inProduction" type="boolean">
+  Returns `true` if `NODE_ENV` is set to `'production'`.
+</ResponseField>
+
+### inDev
+
+Check if the application is running in development mode.
+
+```typescript
+if (app.inDev) {
+  // Development-specific logic
+}
+```
+
+<ResponseField name="inDev" type="boolean">
+  Returns `true` if `NODE_ENV` is not set to `'production'` or `'test'`.
+</ResponseField>
+
+### inTest
+
+Check if the application is running in test mode.
+
+```typescript
+if (app.inTest) {
+  // Test-specific logic
+}
+```
+
+<ResponseField name="inTest" type="boolean">
+  Returns `true` if `NODE_ENV` is set to `'test'`.
+</ResponseField>
+
+## Notification
+
+### notify
+
+Notifies the parent process with application status information.
+
+```typescript
+app.notify(payload)
+```
+
+<ParamField path="payload" type="object" required>
+  Notification payload to send to the parent process.
+  
+  <Expandable title="properties">
+    <ParamField path="isAdonisJS" type="boolean">
+      Identifies the notification as coming from an AdonisJS application.
+    </ParamField>
+    <ParamField path="environment" type="string">
+      The current environment.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Usage Examples
+
+### Basic Application Lifecycle
+
+```typescript
+import { Application } from '@adonisjs/core/app'
+
+const app = new Application(new URL('../', import.meta.url))
+
+// Initialize
+await app.init()
+
+// Boot providers
+await app.boot()
+
+// Start application
+await app.start(async () => {
+  console.log('Application is starting')
+})
+
+// Terminate when done
+await app.terminate()
+```
+
+### Using Lifecycle Hooks
+
+```typescript
+app.booting(() => {
+  console.log('Application is booting')
+})
+
+app.ready(() => {
+  console.log('Application is ready')
+})
+
+app.terminating(async () => {
+  console.log('Cleaning up resources')
+  // Close database connections, etc.
+})
+```
+
+### Accessing Container Services
+
+```typescript
+// After the app is initialized and booted
+const logger = await app.container.make('logger')
+const router = await app.container.make('router')
+const server = await app.container.make('server')
+
+logger.info('Application started')
+```
+
+### Environment-Specific Logic
+
+```typescript
+if (app.inProduction) {
+  // Enable production optimizations
+  app.config.set('app.debug', false)
+}
+
+if (app.inDev) {
+  // Enable development tools
+  app.config.set('app.debug', true)
+}
+
+if (app.inTest) {
+  // Use in-memory database
+  app.config.set('database.connection', 'sqlite')
+}
+```

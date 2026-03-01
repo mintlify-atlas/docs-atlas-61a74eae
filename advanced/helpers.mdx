@@ -1,0 +1,489 @@
+---
+title: Helper Utilities
+description: Collection of helper utilities for string manipulation, type checking, cryptography, and HTTP operations in AdonisJS
+---
+
+AdonisJS provides a comprehensive collection of helper utilities for common tasks including string manipulation, type checking, cryptographic operations, file system utilities, and HTTP helpers.
+
+## Overview
+
+Helper utilities are available under the `@adonisjs/core/helpers` module and provide:
+
+- String transformation and manipulation
+- Type checking with TypeScript guards
+- Cryptographic utilities (base64, hashing, secrets)
+- File system operations
+- HTTP route and middleware helpers
+- Assertion utilities
+- Verification token management
+
+## String Helpers
+
+Import string utilities for powerful text transformations:
+
+```ts
+import string from '@adonisjs/core/helpers/string'
+```
+
+### Case Transformations
+
+```ts
+// Case conversions
+string.camelCase('hello_world')       // 'helloWorld'
+string.snakeCase('HelloWorld')        // 'hello_world'
+string.pascalCase('hello world')      // 'HelloWorld'
+string.dashCase('hello world')        // 'hello-world'
+string.capitalCase('hello world')     // 'Hello World'
+
+// Sentence formatting
+string.toSentence('hello_world')      // 'Hello world'
+string.toSentence('firstName')        // 'First name'
+```
+
+### String Utilities
+
+```ts
+// Pluralization
+string.pluralize('user')              // 'users'
+string.pluralize('person')            // 'people'
+string.pluralize('child', 5)          // 'children'
+string.pluralize('child', 1)          // 'child'
+
+// Ordinals
+string.ordinalize(1)                  // '1st'
+string.ordinalize(22)                 // '22nd'
+string.ordinalize(103)                // '103rd'
+
+// Truncation
+string.truncate('Long text here', 10) // 'Long te...'
+string.excerpt('A long paragraph', 15, { completeWords: true })
+
+// Random strings
+string.generateRandom(16)             // Cryptographically secure random string
+string.generateRandom(32)
+```
+
+### Empty String Check
+
+```ts
+string.isEmpty('')                    // true
+string.isEmpty('   ')                 // true
+string.isEmpty('hello')               // false
+```
+
+### HTML Escaping
+
+```ts
+// Escape HTML to prevent XSS
+string.escapeHTML('<script>alert("xss")</script>')
+// '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
+
+// Encode symbols
+string.encodeSymbols('© 2024 AdonisJS ™')
+// '&copy; 2024 AdonisJS &trade;'
+
+// Combined
+string.escapeHTML('© 2024', { encodeSymbols: true })
+// '&copy; 2024'
+```
+
+### String Builder
+
+Efficiently concatenate strings:
+
+```ts
+const builder = string.create('Hello')
+builder.append(' ')
+builder.append('World')
+builder.append('!')
+
+console.log(builder.toString()) // 'Hello World!'
+```
+
+### Time Formatting
+
+Format high-resolution time differences:
+
+```ts
+const start = process.hrtime()
+// ... some operation
+const diff = process.hrtime(start)
+
+string.prettyHrTime(diff)
+// '2.5ms'
+
+string.prettyHrTime(diff, { verbose: true })
+// '2 milliseconds'
+
+string.prettyHrTime(diff, { precise: true })
+// '2.543ms'
+```
+
+## Type Checking
+
+Import the `is` helper for comprehensive type checking:
+
+```ts
+import { is } from '@adonisjs/core/helpers'
+```
+
+### Basic Type Checks
+
+```ts
+is.string('hello')                    // true
+is.number(42)                         // true
+is.boolean(true)                      // true
+is.null(null)                         // true
+is.undefined(undefined)               // true
+
+// Objects and arrays
+is.object({})                         // true
+is.plainObject({})                    // true (excludes class instances)
+is.array([1, 2, 3])                   // true
+is.emptyArray([])                     // true
+is.nonEmptyArray([1])                 // true
+```
+
+### Advanced Checks
+
+```ts
+// Functions and classes
+is.function(() => {})                 // true
+is.asyncFunction(async () => {})     // true
+is.class(class MyClass {})            // true
+
+// Numbers
+is.integer(42)                        // true
+is.float(3.14)                        // true
+is.positive(5)                        // true
+is.negative(-5)                       // true
+is.inRange(5, [1, 10])               // true
+
+// Dates
+is.date(new Date())                   // true
+is.validDate(new Date('invalid'))    // false
+
+// Errors
+is.error(new Error())                 // true
+is.nativeError(new TypeError())       // true
+```
+
+### Type Guards
+
+TypeScript type narrowing with guards:
+
+```ts
+function processValue(value: unknown) {
+  if (is.string(value)) {
+    // TypeScript knows value is string
+    console.log(value.toUpperCase())
+  }
+  
+  if (is.number(value) && is.positive(value)) {
+    // TypeScript knows value is positive number
+    console.log(value * 2)
+  }
+}
+```
+
+## Assertion Helpers
+
+Import assertion utilities for type-safe programming:
+
+```ts
+import {
+  assertExists,
+  assertNotNull,
+  assertIsDefined,
+  assertUnreachable
+} from '@adonisjs/core/helpers'
+```
+
+### Existence Assertions
+
+```ts
+function processUser(user: User | null) {
+  assertExists(user) // Throws if null or undefined
+  // TypeScript now knows user is not null
+  console.log(user.name)
+}
+
+function getConfig(config: Config | undefined) {
+  assertIsDefined(config) // Throws if undefined
+  return config.value
+}
+
+function findUser(user: User | null) {
+  assertNotNull(user) // Throws if null
+  return user
+}
+```
+
+### Exhaustiveness Checking
+
+```ts
+type Status = 'pending' | 'completed' | 'failed'
+
+function handleStatus(status: Status) {
+  switch (status) {
+    case 'pending':
+      return 'Processing...'
+    case 'completed':
+      return 'Done!'
+    case 'failed':
+      return 'Error!'
+    default:
+      // Ensures all cases are handled
+      return assertUnreachable(status)
+  }
+}
+```
+
+## Cryptographic Utilities
+
+### Base64 Encoding
+
+```ts
+import { base64 } from '@adonisjs/core/helpers'
+
+// Standard base64
+const encoded = base64.encode('sensitive data')
+const decoded = base64.decode(encoded)
+
+// URL-safe base64
+const urlEncoded = base64.urlEncode('data with special chars')
+const urlDecoded = base64.urlDecode(urlEncoded)
+```
+
+### Safe Equality
+
+Compare strings/buffers in constant time to prevent timing attacks:
+
+```ts
+import { safeEqual } from '@adonisjs/core/helpers'
+
+const hash1 = 'user-provided-hash'
+const hash2 = 'stored-hash'
+
+if (safeEqual(hash1, hash2)) {
+  // Hashes match
+}
+```
+
+### Secret Management
+
+Wrap sensitive values to prevent accidental logging:
+
+```ts
+import { Secret } from '@adonisjs/core/helpers'
+
+const apiKey = new Secret('sk_live_abc123')
+
+console.log(apiKey)
+// Output: Secret { [redacted] }
+
+// Release secret when needed
+const key = apiKey.release()
+// 'sk_live_abc123'
+```
+
+## Verification Tokens
+
+Create secure tokens for email verification, password resets, etc.:
+
+```ts
+import { VerificationToken } from '@adonisjs/core/helpers'
+
+class UserToken extends VerificationToken {
+  constructor(user: User, secret: Secret<string>) {
+    super()
+    this.tokenableId = user.id
+    this.computeValue(secret)
+  }
+}
+```
+
+### Creating Tokens
+
+```ts
+// Create a transient token
+const { secret, hash, userId, expiresAt } = VerificationToken.createTransientToken(
+  user.id,    // User ID
+  40,         // Token size
+  '2 hours'   // Expiration
+)
+
+// Store hash in database
+await db.table('tokens').insert({
+  userId,
+  hash,
+  expiresAt
+})
+
+// Send secret to user
+await mail.send('verify-email', { token: secret.release() })
+```
+
+### Verifying Tokens
+
+```ts
+// Decode token from user input
+const decoded = VerificationToken.decode(userProvidedToken)
+
+if (!decoded) {
+  throw new Error('Invalid token format')
+}
+
+// Find token in database
+const tokenRecord = await db
+  .table('tokens')
+  .where('id', decoded.identifier)
+  .first()
+
+// Create token instance
+const token = new UserToken(user, decoded.secret)
+
+// Verify and check expiration
+if (token.verify(decoded.secret) && !token.isExpired()) {
+  // Token is valid
+  await verifyUser(user)
+}
+```
+
+## File System Utilities
+
+```ts
+import { fsReadAll, fsImportAll } from '@adonisjs/core/helpers'
+```
+
+### Reading Files
+
+Recursively read files from a directory:
+
+```ts
+const files = await fsReadAll(new URL('app/controllers', import.meta.url))
+
+for (const file of files) {
+  console.log(file.path)
+  console.log(file.contents)
+}
+```
+
+### Importing Modules
+
+Recursively import ES modules:
+
+```ts
+const modules = await fsImportAll(new URL('app/events', import.meta.url))
+
+for (const [path, module] of modules) {
+  console.log(path, module.default)
+}
+```
+
+## HTTP Helpers
+
+Utilities for routes and middleware:
+
+```ts
+import { middlewareInfo, routeInfo } from '@adonisjs/core/helpers'
+```
+
+### Middleware Metadata
+
+```ts
+const middleware = middlewareInfo('auth', AuthMiddleware)
+
+router.get('/profile', [middleware]).use(ProfileController, 'show')
+```
+
+### Route Metadata
+
+```ts
+const route = routeInfo('users.show', '/users/:id')
+
+router.get('/users/:id', [UserController, 'show']).as('users.show')
+```
+
+## Composition
+
+Compose multiple functions:
+
+```ts
+import { compose } from '@adonisjs/core/helpers'
+
+const addTax = (price: number) => price * 1.2
+const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
+
+const priceFormatter = compose(addTax, formatCurrency)
+
+priceFormatter(100) // '$120.00'
+```
+
+## Message Builder
+
+Build structured error messages:
+
+```ts
+import { MessageBuilder } from '@adonisjs/core/helpers'
+
+const builder = new MessageBuilder()
+
+builder.add('E_VALIDATION_ERROR', 'Validation failed')
+builder.add('E_MISSING_FIELD', 'The {{ field }} field is required', { field: 'email' })
+
+const messages = builder.toJSON()
+```
+
+## Best Practices
+
+<Tip>
+Use type guards (`is` helpers) instead of `typeof` checks for better TypeScript integration and more comprehensive type detection.
+</Tip>
+
+<Note>
+Always wrap sensitive data like API keys and passwords in the `Secret` class to prevent accidental logging.
+</Note>
+
+<Warning>
+Use `safeEqual()` for comparing hashes and tokens to prevent timing attacks. Never use `===` for security-sensitive comparisons.
+</Warning>
+
+### String Performance
+
+For multiple concatenations, use `StringBuilder`:
+
+```ts
+// Bad - Creates multiple string objects
+let result = ''
+for (const item of items) {
+  result += item + '\n'
+}
+
+// Good - Efficient string building
+const builder = string.create('')
+for (const item of items) {
+  builder.append(item).append('\n')
+}
+const result = builder.toString()
+```
+
+### Token Security
+
+Always use sufficient token size and expiration:
+
+```ts
+// Good - 40 characters, 2-hour expiration
+const token = VerificationToken.createTransientToken(
+  user.id,
+  40,        // Secure length
+  '2 hours'  // Reasonable expiration
+)
+
+// Bad - Too short, no expiration
+const badToken = VerificationToken.createTransientToken(
+  user.id,
+  10,         // Too short!
+  '30 days'   // Too long!
+)
+```

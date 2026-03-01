@@ -1,0 +1,164 @@
+---
+title: REPL
+description: Interactive REPL (Read-Eval-Print Loop) for AdonisJS applications
+---
+
+The REPL module provides an interactive Read-Eval-Print Loop for AdonisJS applications, allowing you to interact with your application in real-time through the command line.
+
+## Starting the REPL
+
+You can start the REPL using the `repl` command:
+
+```bash
+node ace repl
+```
+
+This will start an interactive Node.js REPL session with your AdonisJS application context loaded.
+
+## Features
+
+The AdonisJS REPL provides several powerful features:
+
+- **Application Context**: Access your application instance, container, and all registered services
+- **Auto-completion**: Tab completion for methods and properties
+- **Helper Methods**: Built-in helpers for common tasks
+- **Module Access**: Import and test modules directly
+
+## Accessing Application Services
+
+The REPL automatically makes several services available:
+
+```javascript
+// Access the application instance
+app
+
+// Access the container
+container
+
+// Access registered services
+logger.info('Hello from REPL')
+router.toJSON()
+config.get('app')
+```
+
+## Using the REPL for Development
+
+### Testing Models and Queries
+
+```javascript
+// Import your models
+const User = await import('#models/user')
+
+// Test queries
+const users = await User.all()
+console.log(users)
+```
+
+### Testing Services
+
+```javascript
+// Access container services
+const hash = await container.make('hash')
+const hashed = await hash.make('secret')
+console.log(hashed)
+```
+
+### Debugging Configuration
+
+```javascript
+// Check configuration values
+config.get('database')
+config.get('app.appKey')
+
+// Test environment variables
+env.get('NODE_ENV')
+```
+
+## REPL Commands
+
+The REPL supports special commands:
+
+<ParamField path=".break" type="command">
+  Exit a multi-line expression
+</ParamField>
+
+<ParamField path=".clear" type="command">
+  Clear the REPL context
+</ParamField>
+
+<ParamField path=".exit" type="command">
+  Exit the REPL session
+</ParamField>
+
+<ParamField path=".help" type="command">
+  Show available commands
+</ParamField>
+
+<ParamField path=".load" type="command">
+  Load a JavaScript file into the session
+</ParamField>
+
+<ParamField path=".save" type="command">
+  Save the session to a file
+</ParamField>
+
+## Custom REPL Bindings
+
+You can extend the REPL with custom bindings using a service provider:
+
+```typescript
+import { ReplBinding } from '@adonisjs/core/repl'
+
+export default class ReplProvider {
+  constructor(protected app: ApplicationService) {}
+
+  async ready() {
+    this.app.container.withBindings(['repl'], (repl) => {
+      repl.addMethod(
+        'loadUser',
+        async (id: number) => {
+          const User = await import('#models/user')
+          return User.find(id)
+        },
+        {
+          description: 'Load a user by ID'
+        }
+      )
+    })
+  }
+}
+```
+
+## Module Re-exports
+
+The REPL module re-exports all functionality from `@adonisjs/repl`:
+
+```typescript
+export * from '@adonisjs/repl'
+```
+
+<Info>
+The REPL is built on top of Node.js's native REPL module with AdonisJS-specific enhancements.
+</Info>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use for quick testing">
+    The REPL is perfect for quickly testing code snippets, queries, or services without writing test files.
+  </Accordion>
+  
+  <Accordion title="Avoid production use">
+    The REPL is a development tool and should not be used in production environments.
+  </Accordion>
+  
+  <Accordion title="Import modules as needed">
+    Use dynamic imports to load modules on-demand rather than loading everything at startup.
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+- [Ace CLI Overview](/ace/overview) - Learn about other CLI commands
+- [Testing](/advanced/testing) - Test utilities for unit and integration tests
+- [Container](/architecture/container) - Dependency injection container

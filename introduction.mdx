@@ -1,0 +1,197 @@
+---
+title: "Introduction to AdonisJS Core"
+description: "A fullstack MVC framework for Node.js with focus on ergonomics and speed"
+---
+
+<img
+  className="block"
+  src="/images/hero-light.svg"
+  alt="AdonisJS Hero Light"
+/>
+
+# Welcome to AdonisJS
+
+AdonisJS is a fullstack Web framework with focus on **ergonomics and speed**. It takes care of much of the Web development hassles, offering you a clean and stable API to build Web apps and micro services.
+
+## Why AdonisJS?
+
+AdonisJS provides a complete ecosystem for building modern web applications with TypeScript. Built on top of Node.js, it offers first-class support for modern JavaScript features while maintaining backwards compatibility.
+
+<CardGroup cols={2}>
+  <Card title="Type-Safe" icon="shield-check">
+    Built with TypeScript from the ground up, providing excellent IDE support and compile-time type checking for safer code.
+  </Card>
+  
+  <Card title="Modular Architecture" icon="cubes">
+    Clean separation of concerns with service providers, dependency injection, and a powerful IoC container.
+  </Card>
+  
+  <Card title="Modern HTTP Server" icon="server">
+    High-performance HTTP server built on top of Node.js with routing, middleware, request validation, and more.
+  </Card>
+  
+  <Card title="CLI First" icon="terminal">
+    Powerful Ace CLI for scaffolding, running commands, and managing your application lifecycle.
+  </Card>
+  
+  <Card title="Developer Experience" icon="code">
+    Exceptional developer experience with hot module reloading, detailed error pages, and comprehensive documentation.
+  </Card>
+  
+  <Card title="Production Ready" icon="rocket">
+    Battle-tested in production with built-in security features, logging, encryption, and health checks.
+  </Card>
+</CardGroup>
+
+## Core Features
+
+AdonisJS Core provides the foundation for building web applications:
+
+### Application Lifecycle
+
+The **Ignitor** class manages your application's lifecycle, making it easy to bootstrap your app in different environments:
+
+- **Web environment** - Start an HTTP server for handling requests
+- **Console environment** - Run CLI commands with Ace
+- **Test environment** - Execute your test suite
+- **REPL environment** - Interactive Node.js shell
+
+### HTTP Server
+
+<AccordionGroup>
+  <Accordion title="Routing" icon="route">
+    Define routes with support for parameters, query strings, named routes, and route groups. Built-in support for RESTful resources.
+  </Accordion>
+  
+  <Accordion title="Middleware" icon="filter">
+    Chain middleware functions to handle cross-cutting concerns like authentication, CORS, and request logging.
+  </Accordion>
+  
+  <Accordion title="Request & Response" icon="arrows-left-right">
+    Rich APIs for working with HTTP requests and responses, including JSON, file uploads, cookies, and sessions.
+  </Accordion>
+  
+  <Accordion title="Validation" icon="circle-check">
+    First-class integration with VineJS for powerful, type-safe request validation.
+  </Accordion>
+</AccordionGroup>
+
+### Core Modules
+
+AdonisJS Core bundles essential modules for common web development tasks:
+
+<CardGroup cols={3}>
+  <Card title="Config" icon="gear" href="/modules/config">
+    Centralized configuration management
+  </Card>
+  
+  <Card title="Env" icon="key" href="/modules/env">
+    Environment variable validation
+  </Card>
+  
+  <Card title="Events" icon="bolt" href="/modules/events">
+    Event-driven architecture
+  </Card>
+  
+  <Card title="Logger" icon="file-lines" href="/modules/logger">
+    Structured logging with Pino
+  </Card>
+  
+  <Card title="Hash" icon="lock" href="/modules/hash">
+    Password hashing with Argon2/Bcrypt
+  </Card>
+  
+  <Card title="Encryption" icon="shield" href="/modules/encryption">
+    Data encryption and decryption
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+Here's a minimal example of creating an HTTP server with AdonisJS Core:
+
+```typescript
+import { Ignitor } from '@adonisjs/core'
+
+const ignitor = new Ignitor(new URL('./', import.meta.url))
+
+ignitor
+  .tap((app) => {
+    app.booting(async () => {
+      const router = await app.container.make('router')
+      router.get('/', () => {
+        return { hello: 'world' }
+      })
+    })
+  })
+
+ignitor.httpServer().start()
+```
+
+<Info>
+  The Ignitor class is the entry point for all AdonisJS applications. It handles bootstrapping your app in different environments (web, console, test, or REPL).
+</Info>
+
+## System Requirements
+
+<Note>
+  AdonisJS requires **Node.js version 24.0.0 or higher**. We recommend using the latest LTS version of Node.js.
+</Note>
+
+## Get Started
+
+Ready to build your first AdonisJS application?
+
+<CardGroup cols={2}>
+  <Card 
+    title="Installation" 
+    icon="download" 
+    href="/installation"
+  >
+    Install AdonisJS Core and set up your development environment
+  </Card>
+  
+  <Card 
+    title="Quick Start" 
+    icon="rocket" 
+    href="/quickstart"
+  >
+    Build your first HTTP server in minutes
+  </Card>
+</CardGroup>
+
+## Architecture Overview
+
+Understand the core concepts behind AdonisJS:
+
+<CardGroup cols={2}>
+  <Card title="Ignitor" icon="fire" href="/architecture/ignitor">
+    Application bootstrapper and lifecycle manager
+  </Card>
+  
+  <Card title="Service Providers" icon="plug" href="/architecture/service-providers">
+    Register and boot application services
+  </Card>
+  
+  <Card title="IoC Container" icon="box" href="/architecture/container">
+    Dependency injection and service resolution
+  </Card>
+  
+  <Card title="Application Lifecycle" icon="arrows-spin" href="/architecture/application-lifecycle">
+    Understand the application boot process
+  </Card>
+</CardGroup>
+
+## Community & Support
+
+Join the AdonisJS community:
+
+<CardGroup cols={2}>
+  <Card title="GitHub" icon="github" href="https://github.com/adonisjs/core">
+    View the source code and contribute
+  </Card>
+  
+  <Card title="Documentation" icon="book" href="https://docs.adonisjs.com">
+    Complete guides and API reference
+  </Card>
+</CardGroup>

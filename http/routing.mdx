@@ -1,0 +1,252 @@
+---
+title: Routing
+description: Define HTTP routes in AdonisJS using the Router service to handle incoming requests and map them to controllers or closures
+---
+
+Routing in AdonisJS allows you to map HTTP requests to specific handlers. Routes are typically defined in the `start/routes.ts` file.
+
+## Defining routes
+
+Import the router service and define routes using HTTP method helpers:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+// GET request
+router.get('/users', () => {
+  return { users: [] }
+})
+
+// POST request
+router.post('/users', ({ request }) => {
+  const body = request.all()
+  return { created: true }
+})
+
+// Other HTTP methods
+router.put('/users/:id', () => {})
+router.patch('/users/:id', () => {})
+router.delete('/users/:id', () => {})
+```
+
+## Route parameters
+
+Define dynamic segments in your routes using the `:param` syntax:
+
+```typescript
+// Single parameter
+router.get('/users/:id', ({ params }) => {
+  return { user: { id: params.id } }
+})
+
+// Multiple parameters
+router.get('/posts/:id/:slug', ({ params }) => {
+  return { id: params.id, slug: params.slug }
+})
+
+// Optional parameters
+router.get('/articles/:id/:slug?', ({ params }) => {
+  // slug is optional
+  return { id: params.id, slug: params.slug }
+})
+
+// Wildcard parameters
+router.get('/files/:directory/*', ({ params }) => {
+  // Matches /files/docs/guide/intro.md
+  return { directory: params.directory, wildcard: params['*'] }
+})
+```
+
+## Named routes
+
+Assign names to routes for easier URL generation:
+
+```typescript
+router
+  .get('/users/:id', ({ params }) => {})
+  .as('users.show')
+
+router
+  .post('/users', ({ request }) => {})
+  .as('users.store')
+
+// Generate URL from route name
+const url = router.makeUrl('users.show', { id: 1 })
+// Returns: /users/1
+```
+
+## Route handlers
+
+Routes can use different types of handlers:
+
+### Closure handlers
+
+```typescript
+router.get('/hello', ({ response }) => {
+  return response.json({ message: 'Hello' })
+})
+```
+
+### Controller references
+
+```typescript
+// Using controller string reference
+router.get('/users', '#controllers/users_controller.index')
+
+// Using controller array reference
+import UsersController from '#controllers/users_controller'
+router.get('/users', [UsersController, 'index'])
+
+// Using lazy-loaded controller
+router.get('/posts', [
+  () => import('#controllers/posts_controller'),
+  'index'
+])
+```
+
+### Render a view
+
+```typescript
+// Directly render a view with data
+router.on('/welcome').render('welcome', { username: 'virk' })
+```
+
+### Redirect
+
+```typescript
+// Redirect to another URL
+router.on('/blog').redirect('/articles')
+
+// Redirect to a named route
+router.on('/old-path').redirectToRoute('new.route', { id: 1 })
+```
+
+## Route groups
+
+Group routes to apply common configuration:
+
+```typescript
+router.group(() => {
+  router.get('/posts', '#controllers/posts_controller.index')
+  router.post('/posts', '#controllers/posts_controller.store')
+  router.get('/posts/:id', '#controllers/posts_controller.show')
+})
+  .prefix('/api/v1')        // All routes prefixed with /api/v1
+  .middleware(['auth'])     // Apply auth middleware to all routes
+  .as('api.v1')            // Prefix all route names with api.v1
+```
+
+### Nested groups
+
+```typescript
+router.group(() => {
+  // Public routes
+  router.get('/posts', '#controllers/posts_controller.index')
+  
+  // Protected routes
+  router.group(() => {
+    router.post('/posts', '#controllers/posts_controller.store')
+    router.delete('/posts/:id', '#controllers/posts_controller.destroy')
+  }).middleware(['auth'])
+  
+}).prefix('/api')
+```
+
+## Route middleware
+
+Apply middleware to individual routes:
+
+```typescript
+router
+  .get('/dashboard', '#controllers/dashboard_controller.index')
+  .use(middleware.auth())
+
+// Multiple middleware
+router
+  .get('/admin', '#controllers/admin_controller.index')
+  .use([middleware.auth(), middleware.admin()])
+```
+
+## Route domains
+
+Restrict routes to specific domains:
+
+```typescript
+router
+  .get('/articles', '#controllers/articles_controller.index')
+  .domain('blog.adonisjs.com')
+
+router
+  .get('/articles/:id', '#controllers/articles_controller.show')
+  .domain('blog.adonisjs.com')
+```
+
+## Resourceful routes
+
+Create RESTful routes for a resource:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+router.resource('posts', '#controllers/posts_controller')
+```
+
+This creates the following routes:
+
+| Method | URL | Handler | Name |
+|--------|-----|---------|------|
+| GET | /posts | index | posts.index |
+| GET | /posts/create | create | posts.create |
+| POST | /posts | store | posts.store |
+| GET | /posts/:id | show | posts.show |
+| GET | /posts/:id/edit | edit | posts.edit |
+| PUT/PATCH | /posts/:id | update | posts.update |
+| DELETE | /posts/:id | destroy | posts.destroy |
+
+### API resources
+
+For APIs, exclude the `create` and `edit` routes:
+
+```typescript
+router.resource('posts', '#controllers/posts_controller')
+  .apiOnly()
+```
+
+### Filtering resource routes
+
+```typescript
+// Only create specific routes
+router.resource('posts', '#controllers/posts_controller')
+  .only(['index', 'show', 'store'])
+
+// Exclude specific routes
+router.resource('posts', '#controllers/posts_controller')
+  .except(['create', 'edit'])
+```
+
+## Listing routes
+
+View all registered routes using the Ace command:
+
+```bash
+node ace list:routes
+```
+
+This displays a formatted table with all routes, their methods, patterns, handlers, and middleware.
+
+## TypeScript types
+
+Get type-safe route parameters:
+
+```typescript
+import type { InferRouteParams } from '@adonisjs/core/types/http'
+
+router.get('/posts/:id/:slug', ({ params }) => {
+  // params is typed as { id: string, slug: string }
+  return { id: params.id, slug: params.slug }
+})
+
+// Extract route params type
+type Params = InferRouteParams<'/posts/:id/:slug'>
+// { id: string, slug: string }
+```

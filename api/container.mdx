@@ -1,0 +1,406 @@
+---
+title: Container
+description: API reference for the IoC Container used for dependency injection and service management in AdonisJS
+---
+
+The Container module provides dependency injection capabilities for AdonisJS applications. It re-exports all functionality from `@adonisjs/fold`, which is the underlying IoC container implementation.
+
+## Import
+
+```typescript
+import { Container } from '@adonisjs/core/container'
+import { inject } from '@adonisjs/core'
+import type { ContainerBindings } from '@adonisjs/core/types'
+```
+
+## ContainerBindings Interface
+
+The `ContainerBindings` interface defines all services registered in the IoC container and available for dependency injection.
+
+```typescript
+interface ContainerBindings {
+  ace: Kernel
+  dumper: Dumper
+  app: ApplicationService
+  logger: LoggerService
+  config: ApplicationService['config']
+  emitter: EmitterService
+  encryption: EncryptionService
+  hash: HashService
+  server: HttpServerService
+  router: HttpRouterService
+  testUtils: TestUtils
+  repl: Repl
+}
+```
+
+## Core Container Methods
+
+### make
+
+Resolves a binding from the container.
+
+```typescript
+const logger = await container.make('logger')
+```
+
+<ParamField path="binding" type="keyof ContainerBindings" required>
+  The name of the binding to resolve from the container.
+</ParamField>
+
+<ResponseField name="return" type="Promise<T>">
+  Returns a promise that resolves to the binding value.
+</ResponseField>
+
+### bind
+
+Binds a value or factory function to the container.
+
+```typescript
+container.bind('myService', () => {
+  return new MyService()
+})
+```
+
+<ParamField path="key" type="string" required>
+  The binding key.
+</ParamField>
+
+<ParamField path="factory" type="(container: Container) => any" required>
+  Factory function that returns the binding value.
+</ParamField>
+
+### bindValue
+
+Binds a static value to the container.
+
+```typescript
+container.bindValue('config', configObject)
+```
+
+<ParamField path="key" type="string" required>
+  The binding key.
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  The value to bind.
+</ParamField>
+
+### singleton
+
+Binds a singleton to the container. The factory is called only once.
+
+```typescript
+container.singleton('database', () => {
+  return new Database()
+})
+```
+
+<ParamField path="key" type="string" required>
+  The binding key.
+</ParamField>
+
+<ParamField path="factory" type="(container: Container) => any" required>
+  Factory function that returns the singleton instance.
+</ParamField>
+
+### alias
+
+Creates an alias for an existing binding.
+
+```typescript
+container.alias('log', 'logger')
+```
+
+<ParamField path="alias" type="string" required>
+  The alias name.
+</ParamField>
+
+<ParamField path="binding" type="string" required>
+  The original binding key.
+</ParamField>
+
+### has
+
+Checks if a binding exists in the container.
+
+```typescript
+if (container.has('logger')) {
+  const logger = await container.make('logger')
+}
+```
+
+<ParamField path="key" type="string" required>
+  The binding key to check.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the binding exists.
+</ResponseField>
+
+### hasBinding
+
+Checks if a specific binding (not alias) exists.
+
+```typescript
+if (container.hasBinding('logger')) {
+  // logger is a direct binding
+}
+```
+
+<ParamField path="key" type="string" required>
+  The binding key to check.
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  Returns `true` if the direct binding exists.
+</ResponseField>
+
+## Dependency Injection
+
+### inject
+
+Decorator for automatic dependency injection in class constructors.
+
+```typescript
+import { inject } from '@adonisjs/core'
+
+class UserController {
+  @inject()
+  constructor(
+    protected logger: LoggerService,
+    protected database: DatabaseService
+  ) {}
+}
+```
+
+The `inject` decorator automatically resolves constructor dependencies from the container.
+
+### Manual Injection
+
+You can also manually specify injection tokens:
+
+```typescript
+import { inject } from '@adonisjs/core'
+
+class UserService {
+  @inject(['logger', 'database'])
+  constructor(
+    protected logger: LoggerService,
+    protected database: DatabaseService
+  ) {}
+}
+```
+
+<ParamField path="tokens" type="string[]">
+  Optional array of binding keys to inject. If not provided, the container will attempt to auto-resolve based on parameter types.
+</ParamField>
+
+## Container Events
+
+The container emits events when bindings are resolved.
+
+### container_binding:resolved
+
+Emitted when a container binding is resolved.
+
+```typescript
+const emitter = await app.container.make('emitter')
+
+emitter.on('container_binding:resolved', (event) => {
+  console.log('Resolved:', event.binding)
+  console.log('Value:', event.value)
+})
+```
+
+<ResponseField name="event" type="ContainerResolveEventData">
+  Event data containing binding information.
+  
+  <Expandable title="properties">
+    <ResponseField name="binding" type="string">
+      The name of the resolved binding.
+    </ResponseField>
+    <ResponseField name="value" type="any">
+      The resolved value.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Available Container Services
+
+The following services are pre-registered in the AdonisJS container:
+
+### ace
+
+```typescript
+const ace = await app.container.make('ace')
+```
+
+<ResponseField name="ace" type="Kernel">
+  The Ace command-line kernel for CLI commands.
+</ResponseField>
+
+### app
+
+```typescript
+const app = await container.make('app')
+```
+
+<ResponseField name="app" type="ApplicationService">
+  The main application instance.
+</ResponseField>
+
+### logger
+
+```typescript
+const logger = await container.make('logger')
+```
+
+<ResponseField name="logger" type="LoggerService">
+  The logger manager instance.
+</ResponseField>
+
+### config
+
+```typescript
+const config = await container.make('config')
+```
+
+<ResponseField name="config" type="ConfigProvider">
+  The application configuration.
+</ResponseField>
+
+### emitter
+
+```typescript
+const emitter = await container.make('emitter')
+```
+
+<ResponseField name="emitter" type="EmitterService">
+  The event emitter instance.
+</ResponseField>
+
+### encryption
+
+```typescript
+const encryption = await container.make('encryption')
+```
+
+<ResponseField name="encryption" type="EncryptionService">
+  The encryption service for encrypting and decrypting data.
+</ResponseField>
+
+### hash
+
+```typescript
+const hash = await container.make('hash')
+```
+
+<ResponseField name="hash" type="HashService">
+  The hash manager for password hashing.
+</ResponseField>
+
+### server
+
+```typescript
+const server = await container.make('server')
+```
+
+<ResponseField name="server" type="HttpServerService">
+  The HTTP server instance.
+</ResponseField>
+
+### router
+
+```typescript
+const router = await container.make('router')
+```
+
+<ResponseField name="router" type="HttpRouterService">
+  The HTTP router instance.
+</ResponseField>
+
+## Usage Examples
+
+### Basic Service Resolution
+
+```typescript
+import type { ApplicationService } from '@adonisjs/core/types'
+
+// In a provider or during app lifecycle
+const logger = await app.container.make('logger')
+const router = await app.container.make('router')
+
+logger.info('Application started')
+router.get('/', async () => 'Hello World')
+```
+
+### Creating Custom Bindings
+
+```typescript
+// In a service provider
+export class MyServiceProvider {
+  async register() {
+    this.app.container.singleton('myService', () => {
+      return new MyService()
+    })
+  }
+}
+
+// Extend ContainerBindings type
+declare module '@adonisjs/core/types' {
+  interface ContainerBindings {
+    myService: MyService
+  }
+}
+```
+
+### Using Dependency Injection
+
+```typescript
+import { inject } from '@adonisjs/core'
+import type { LoggerService } from '@adonisjs/core/types'
+
+export default class UsersController {
+  @inject()
+  constructor(protected logger: LoggerService) {}
+
+  async index() {
+    this.logger.info('Listing users')
+    return []
+  }
+}
+```
+
+### Type-Safe Container Access
+
+```typescript
+import type { ApplicationService } from '@adonisjs/core/types'
+
+class UserService {
+  constructor(private app: ApplicationService) {}
+
+  async sendEmail() {
+    // Type-safe container access
+    const logger = await this.app.container.make('logger')
+    const emitter = await this.app.container.make('emitter')
+    
+    logger.info('Sending email')
+    emitter.emit('email:sent', { to: 'user@example.com' })
+  }
+}
+```
+
+### Conditional Bindings
+
+```typescript
+if (app.inProduction) {
+  app.container.singleton('cache', () => {
+    return new RedisCache()
+  })
+} else {
+  app.container.singleton('cache', () => {
+    return new MemoryCache()
+  })
+}
+```

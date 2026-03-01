@@ -1,0 +1,241 @@
+---
+title: Testing Utilities
+description: Testing helper utilities for creating HTTP contexts and starting test servers in AdonisJS
+---
+
+AdonisJS provides a comprehensive set of testing utilities to make integration and unit testing seamless. The `TestUtils` class offers helpers for HTTP testing, context creation, and cookie handling.
+
+## Overview
+
+The testing utilities are automatically available through the IoC container and provide:
+
+- HTTP context creation for unit tests
+- HTTP server management for integration tests
+- Cookie client for testing cookie-based functionality
+- Macroable interface for custom extensions
+
+## Getting Started
+
+Access test utilities from the application container:
+
+```ts
+import { test } from '@japa/runner'
+
+test('example test', async ({ assert }) => {
+  const testUtils = await app.container.make('testUtils')
+  await testUtils.boot()
+  
+  // Use test utilities
+})
+```
+
+## Creating HTTP Contexts
+
+Create HTTP context instances for testing controllers, middleware, and other HTTP-related code:
+
+```ts
+const testUtils = await app.container.make('testUtils')
+await testUtils.boot()
+
+const ctx = await testUtils.createHttpContext()
+
+// Access request and response
+ctx.request.updateBody({ name: 'John' })
+ctx.response.send({ success: true })
+```
+
+### Custom Request and Response
+
+Provide custom `IncomingMessage` and `ServerResponse` objects:
+
+```ts
+import { IncomingMessage, ServerResponse } from 'node:http'
+import { Socket } from 'node:net'
+
+const req = new IncomingMessage(new Socket())
+const res = new ServerResponse(req)
+
+// Customize request
+req.url = '/users/1'
+req.method = 'GET'
+
+const ctx = await testUtils.createHttpContext({ req, res })
+```
+
+## HTTP Server Testing
+
+Start the AdonisJS HTTP server for integration testing:
+
+```ts
+const testUtils = await app.container.make('testUtils')
+const httpUtils = testUtils.httpServer()
+
+const closeServer = await httpUtils.start()
+
+// Make HTTP requests to your server
+// Using your preferred HTTP client
+
+await closeServer() // Clean up
+```
+
+### With Custom Server
+
+Provide a custom HTTP/HTTPS server callback:
+
+```ts
+import { createServer } from 'node:https'
+import { readFileSync } from 'node:fs'
+
+const closeServer = await httpUtils.start((handler) => {
+  return createServer({
+    key: readFileSync('key.pem'),
+    cert: readFileSync('cert.pem')
+  }, handler)
+})
+```
+
+### Environment Variables
+
+The server respects `HOST` and `PORT` environment variables:
+
+```ts
+process.env.HOST = '127.0.0.1'
+process.env.PORT = '4000'
+
+const closeServer = await httpUtils.start()
+// Server listening on http://127.0.0.1:4000
+```
+
+## Cookie Testing
+
+The `cookies` client helps test cookie-based functionality:
+
+```ts
+const testUtils = await app.container.make('testUtils')
+await testUtils.boot()
+
+// Access cookie client
+const cookies = testUtils.cookies
+
+// Sign cookies
+const signed = cookies.sign('session_id', 'abc123')
+
+// Encrypt cookies
+const encrypted = cookies.encrypt('user_data', { id: 1 })
+
+// Verify and decrypt in tests
+const verified = cookies.verify('session_id', signed)
+const decrypted = cookies.decrypt('user_data', encrypted)
+```
+
+## API Reference
+
+### TestUtils
+
+<ParamField path="app" type="ApplicationService">
+  The application service instance
+</ParamField>
+
+<ParamField path="isBooted" type="boolean">
+  Flag indicating if test utilities have been booted
+</ParamField>
+
+<ParamField path="cookies" type="CookieClient">
+  Cookie client instance for handling cookies in tests
+</ParamField>
+
+### Methods
+
+<ResponseField name="boot" type="() => Promise<void>">
+  Boots the test utilities. Must be called before using other methods. Requires the app to be booted with all container bindings.
+  
+  ```ts
+  await testUtils.boot()
+  ```
+</ResponseField>
+
+<ResponseField name="httpServer" type="() => HttpServerUtils">
+  Returns an instance of HTTP server testing utilities.
+  
+  ```ts
+  const httpUtils = testUtils.httpServer()
+  ```
+</ResponseField>
+
+<ResponseField name="createHttpContext" type="(options?) => Promise<HttpContext>">
+  Creates an HTTP context instance for testing.
+  
+  **Parameters:**
+  - `options.req` - Custom IncomingMessage object (optional)
+  - `options.res` - Custom ServerResponse object (optional)
+  
+  ```ts
+  const ctx = await testUtils.createHttpContext()
+  ```
+</ResponseField>
+
+### HttpServerUtils
+
+<ResponseField name="start" type="(serverCallback?) => Promise<() => Promise<void>>">
+  Starts the HTTP server and returns a cleanup function.
+  
+  **Parameters:**
+  - `serverCallback` - Optional callback to create a custom HTTP/HTTPS server
+  
+  **Returns:** Promise that resolves to a cleanup function to close the server
+  
+  ```ts
+  const closeServer = await httpUtils.start()
+  // ... make requests
+  await closeServer()
+  ```
+</ResponseField>
+
+## Extending Test Utils
+
+`TestUtils` extends `Macroable`, allowing you to add custom methods:
+
+```ts
+import { TestUtils } from '@adonisjs/core/test_utils'
+
+TestUtils.macro('createAuthenticatedContext', async function (user) {
+  const ctx = await this.createHttpContext()
+  ctx.auth.user = user
+  return ctx
+})
+
+// Use in tests
+const ctx = await testUtils.createAuthenticatedContext({ id: 1 })
+```
+
+## Best Practices
+
+<Note>
+Always call `boot()` on test utils before using other methods. The boot method initializes the cookie client and other dependencies.
+</Note>
+
+<Tip>
+Store the cleanup function from `httpServer().start()` and call it in test teardown hooks to properly close the server.
+</Tip>
+
+```ts
+import { test } from '@japa/runner'
+
+test.group('API tests', (group) => {
+  let closeServer: () => Promise<void>
+  
+  group.setup(async () => {
+    const testUtils = await app.container.make('testUtils')
+    const httpUtils = testUtils.httpServer()
+    closeServer = await httpUtils.start()
+  })
+  
+  group.teardown(async () => {
+    await closeServer()
+  })
+  
+  test('GET /users', async ({ client }) => {
+    // Your test here
+  })
+})
+```

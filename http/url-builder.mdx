@@ -1,0 +1,338 @@
+---
+title: URL Builder
+description: Generate URLs for named routes in AdonisJS using the URL builder utility
+---
+
+The URL builder helps you generate URLs for your application's named routes. It ensures your URLs are always correct and makes it easy to change route patterns without updating links throughout your codebase.
+
+## Basic usage
+
+Generate URLs using the router's `makeUrl()` method:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+// Define a named route
+router.get('/users/:id', '#controllers/users_controller.show').as('users.show')
+
+// Generate URL
+const url = router.makeUrl('users.show', { id: 1 })
+// Returns: /users/1
+```
+
+## Named routes
+
+Name your routes using the `.as()` method:
+
+```typescript
+router.get('/posts/:id/:slug', '#controllers/posts_controller.show')
+  .as('posts.show')
+
+router.post('/posts', '#controllers/posts_controller.store')
+  .as('posts.store')
+
+router.get('/profile', '#controllers/profile_controller.show')
+  .as('profile')
+```
+
+## Route parameters
+
+Pass parameters to generate URLs with dynamic segments:
+
+```typescript
+// Route with single parameter
+router.get('/users/:id', '#controllers/users_controller.show').as('users.show')
+
+const url = router.makeUrl('users.show', { id: 42 })
+// Returns: /users/42
+
+// Route with multiple parameters
+router.get('/posts/:id/:slug', '#controllers/posts_controller.show').as('posts.show')
+
+const url = router.makeUrl('posts.show', { id: 1, slug: 'hello-world' })
+// Returns: /posts/1/hello-world
+```
+
+## Query strings
+
+Add query string parameters:
+
+```typescript
+router.get('/posts', '#controllers/posts_controller.index').as('posts.index')
+
+const url = router.makeUrl('posts.index', {}, {
+  qs: { page: 2, limit: 10 }
+})
+// Returns: /posts?page=2&limit=10
+
+// With route parameters and query string
+const url = router.makeUrl('posts.show', { id: 1 }, {
+  qs: { ref: 'homepage' }
+})
+// Returns: /posts/1?ref=homepage
+```
+
+## Absolute URLs
+
+Generate absolute URLs with protocol and domain:
+
+```typescript
+const url = router.makeUrl('users.show', { id: 1 }, {
+  prefixUrl: 'https://example.com'
+})
+// Returns: https://example.com/users/1
+
+// Using app URL from config
+const url = router.makeUrl('users.show', { id: 1 }, {
+  prefixUrl: app.config.get('app.appUrl')
+})
+```
+
+## Signed URLs
+
+Generate signed URLs for temporary access:
+
+```typescript
+// Generate signed URL
+const signedUrl = router.makeSignedUrl('download.file', 
+  { id: 1 },
+  {
+    expiresIn: '30m' // Expires in 30 minutes
+  }
+)
+// Returns: /download/1?signature=...
+
+// Without expiration
+const signedUrl = router.makeSignedUrl('download.file', { id: 1 })
+```
+
+### Verifying signed URLs
+
+Verify signed URLs in your route handlers:
+
+```typescript
+import router from '@adonisjs/core/services/router'
+
+router
+  .get('/download/:id', async ({ request, response, params }) => {
+    // Verify signature
+    if (!request.hasValidSignature()) {
+      return response.badRequest({ error: 'Invalid or expired signature' })
+    }
+    
+    // Proceed with download
+    const file = await File.find(params.id)
+    return response.download(file.path)
+  })
+  .as('download.file')
+```
+
+## Using in templates
+
+The `route()` helper is available in Edge templates:
+
+```edge
+{{-- Generate URL --}}
+<a href="{{ route('users.show', { id: user.id }) }}">
+  View Profile
+</a>
+
+{{-- With query string --}}
+<a href="{{ route('posts.index', {}, { qs: { page: 2 } }) }}">
+  Next Page
+</a>
+
+{{-- Signed URL --}}
+<a href="{{ signedRoute('download.file', { id: file.id }, { expiresIn: '1h' }) }}">
+  Download File
+</a>
+```
+
+## Route groups and prefixes
+
+Route names inherit group prefixes:
+
+```typescript
+router.group(() => {
+  router.get('/users', '#controllers/users_controller.index')
+    .as('users.index')
+  
+  router.get('/users/:id', '#controllers/users_controller.show')
+    .as('users.show')
+}).as('api.v1')
+
+// Generate URL with group prefix
+const url = router.makeUrl('api.v1.users.show', { id: 1 })
+// Returns: /users/1
+```
+
+## Domain-based routes
+
+Generate URLs for domain-specific routes:
+
+```typescript
+router
+  .get('/articles/:id', '#controllers/articles_controller.show')
+  .domain('blog.example.com')
+  .as('articles.show')
+
+const url = router.makeUrl('articles.show', { id: 1 }, {
+  prefixUrl: 'https://blog.example.com'
+})
+// Returns: https://blog.example.com/articles/1
+```
+
+## Form actions
+
+Generate form action URLs:
+
+```edge
+<form method="POST" action="{{ route('users.store') }}">
+  {{ csrfField() }}
+  
+  <input type="email" name="email">
+  <input type="password" name="password">
+  
+  <button type="submit">Sign Up</button>
+</form>
+
+{{-- Update form --}}
+<form method="POST" action="{{ route('users.update', { id: user.id }) }}">
+  {{ csrfField() }}
+  {{ methodField('PUT') }}
+  
+  <input type="text" name="name" value="{{ user.name }}">
+  
+  <button type="submit">Update</button>
+</form>
+```
+
+## Checking route existence
+
+Check if a route exists:
+
+```typescript
+if (router.has('users.show')) {
+  const url = router.makeUrl('users.show', { id: 1 })
+}
+```
+
+## URL builder in Edge
+
+Edge provides the `formAttributes()` helper for forms:
+
+```edge
+<form {{ formAttributes({ action: 'users.store' }) }}>
+  {{ csrfField() }}
+  
+  <input type="email" name="email">
+  <button type="submit">Submit</button>
+</form>
+
+{{-- With route parameters --}}
+<form {{ formAttributes({ 
+  action: 'users.update',
+  params: { id: user.id },
+  method: 'PUT'
+}) }}>
+  {{ csrfField() }}
+  
+  <input type="text" name="name" value="{{ user.name }}">
+  <button type="submit">Update</button>
+</form>
+```
+
+## TypeScript support
+
+The URL builder is fully typed:
+
+```typescript
+import type { InferRouteParams } from '@adonisjs/core/types/http'
+
+// Define route
+router.get('/posts/:id/:slug', '#controllers/posts_controller.show')
+  .as('posts.show')
+
+// Infer parameters
+type PostShowParams = InferRouteParams<'/posts/:id/:slug'>
+// { id: string, slug: string }
+
+// Type-safe URL generation
+const url = router.makeUrl('posts.show', {
+  id: 1,
+  slug: 'hello-world'
+})
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Always name important routes">
+    Name routes that you'll reference in templates or redirect to:
+    
+    ```typescript
+    // Good
+    router.get('/users/:id', '#controllers/users_controller.show')
+      .as('users.show')
+    
+    // Avoid hardcoding URLs
+    response.redirect(`/users/${id}`)
+    
+    // Use named routes instead
+    response.redirect().toRoute('users.show', { id })
+    ```
+  </Accordion>
+  
+  <Accordion title="Use consistent naming conventions">
+    Follow RESTful naming conventions:
+    - `resource.index` - List all
+    - `resource.show` - Show one
+    - `resource.create` - Show create form
+    - `resource.store` - Create new
+    - `resource.edit` - Show edit form
+    - `resource.update` - Update existing
+    - `resource.destroy` - Delete
+  </Accordion>
+  
+  <Accordion title="Group related routes">
+    Use route groups with name prefixes:
+    
+    ```typescript
+    router.group(() => {
+      router.get('/posts', '#controllers/posts_controller.index')
+        .as('posts.index')
+      router.get('/posts/:id', '#controllers/posts_controller.show')
+        .as('posts.show')
+    }).prefix('/api').as('api')
+    
+    // Use: router.makeUrl('api.posts.show', { id: 1 })
+    ```
+  </Accordion>
+  
+  <Accordion title="Validate signed URLs">
+    Always verify signatures for protected routes:
+    
+    ```typescript
+    router
+      .get('/download/:id', async ({ request, response }) => {
+        if (!request.hasValidSignature()) {
+          return response.badRequest({ error: 'Invalid signature' })
+        }
+        // Process download
+      })
+      .as('download.file')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related documentation
+
+<CardGroup cols={2}>
+  <Card title="Routing" icon="route" href="/http/routing">
+    Learn more about defining routes
+  </Card>
+  
+  <Card title="Response" icon="paper-plane" href="/http/response">
+    Learn about redirecting to routes
+  </Card>
+</CardGroup>

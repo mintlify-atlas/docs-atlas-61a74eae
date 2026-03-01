@@ -1,122 +1,149 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "AdonisJS Core",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#5A45FF",
+    "light": "#7C66FF",
+    "dark": "#4835CC"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/adonisjs/core"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/adonisjs/core"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Architecture",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "architecture/overview",
+              "architecture/ignitor",
+              "architecture/application-lifecycle",
+              "architecture/service-providers",
+              "architecture/container"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "HTTP",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "http/overview",
+              "http/routing",
+              "http/controllers",
+              "http/middleware",
+              "http/request",
+              "http/response",
+              "http/validation",
+              "http/url-builder"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Ace CLI",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "ace/overview",
+              "ace/commands",
+              "ace/make-commands",
+              "ace/kernel"
+            ]
+          },
+          {
+            "group": "Core Modules",
+            "pages": [
+              "modules/config",
+              "modules/env",
+              "modules/events",
+              "modules/logger",
+              "modules/hash",
+              "modules/encryption",
+              "modules/bodyparser",
+              "modules/health",
+              "modules/repl",
+              "modules/transformers"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/testing",
+              "advanced/codemods",
+              "advanced/custom-providers",
+              "advanced/helpers"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core",
             "pages": [
-              "api-reference/introduction"
+              "api/ignitor",
+              "api/application",
+              "api/container",
+              "api/errors"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "HTTP Server",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/http/server",
+              "api/http/router",
+              "api/http/request",
+              "api/http/response",
+              "api/http/middleware",
+              "api/http/request-validator"
+            ]
+          },
+          {
+            "group": "Ace CLI",
+            "pages": [
+              "api/ace/kernel",
+              "api/ace/command",
+              "api/ace/codemods"
+            ]
+          },
+          {
+            "group": "Modules",
+            "pages": [
+              "api/modules/config",
+              "api/modules/env",
+              "api/modules/events",
+              "api/modules/logger",
+              "api/modules/hash",
+              "api/modules/encryption",
+              "api/modules/bodyparser",
+              "api/modules/health",
+              "api/modules/transformers"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/helpers",
+              "api/test-utils",
+              "api/factories"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

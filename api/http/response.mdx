@@ -1,0 +1,699 @@
+---
+title: 'Response'
+description: 'HTTP Response API reference for sending responses in AdonisJS'
+---
+
+The `Response` class provides methods for sending HTTP responses, setting headers, cookies, and managing response data.
+
+## Importing
+
+```typescript
+import { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async index({ response }: HttpContext) {
+    // Access response
+  }
+}
+```
+
+## Properties
+
+<ParamField path="finished" type="boolean">
+  Whether the response has been sent
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Whether the response is pending
+</ParamField>
+
+<ParamField path="headersSent" type="boolean">
+  Whether headers have been sent
+</ParamField>
+
+## Sending Responses
+
+### send()
+
+Send a response body.
+
+```typescript
+response.send('Hello World')
+response.send({ message: 'Success' })
+response.send(Buffer.from('data'))
+```
+
+<ParamField path="body" type="any">
+  Response body (string, object, buffer, stream)
+</ParamField>
+
+**Returns:** `void`
+
+### json()
+
+Send a JSON response.
+
+```typescript
+response.json({ 
+  users: [],
+  meta: { total: 0 }
+})
+```
+
+<ParamField path="body" type="any">
+  Data to serialize as JSON
+</ParamField>
+
+**Returns:** `void`
+
+### jsonp()
+
+Send a JSONP response.
+
+```typescript
+response.jsonp({ data: [] })
+```
+
+<ParamField path="body" type="any">
+  Data to serialize as JSONP
+</ParamField>
+
+<ParamField path="callbackName" type="string" default="'callback'">
+  JSONP callback function name
+</ParamField>
+
+**Returns:** `void`
+
+### stream()
+
+Stream a response.
+
+```typescript
+const fileStream = fs.createReadStream('video.mp4')
+response.stream(fileStream)
+```
+
+<ParamField path="stream" type="ReadableStream">
+  Readable stream to pipe
+</ParamField>
+
+**Returns:** `void`
+
+### download()
+
+Download a file.
+
+```typescript
+response.download('storage/invoices/invoice-123.pdf')
+```
+
+<ParamField path="filePath" type="string">
+  Path to the file
+</ParamField>
+
+<ParamField path="fileName" type="string">
+  Optional filename for download
+</ParamField>
+
+**Returns:** `void`
+
+### attachment()
+
+Download a file with a custom name.
+
+```typescript
+response.attachment(
+  'storage/reports/report-2024.pdf',
+  'Annual Report.pdf'
+)
+```
+
+<ParamField path="filePath" type="string">
+  Path to the file
+</ParamField>
+
+<ParamField path="fileName" type="string">
+  Filename for download
+</ParamField>
+
+**Returns:** `void`
+
+## Status Codes
+
+### status()
+
+Set the response status code.
+
+```typescript
+response.status(201).json({ created: true })
+```
+
+<ParamField path="code" type="number">
+  HTTP status code
+</ParamField>
+
+**Returns:** `this`
+
+### getStatus()
+
+Get the current status code.
+
+```typescript
+const status = response.getStatus()
+```
+
+**Returns:** `number`
+
+### safeStatus()
+
+Set status code if not already set.
+
+```typescript
+response.safeStatus(200)
+```
+
+<ParamField path="code" type="number">
+  HTTP status code
+</ParamField>
+
+**Returns:** `this`
+
+## Status Helpers
+
+### ok()
+
+Send a 200 OK response.
+
+```typescript
+response.ok({ message: 'Success' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### created()
+
+Send a 201 Created response.
+
+```typescript
+response.created({ user })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### accepted()
+
+Send a 202 Accepted response.
+
+```typescript
+response.accepted({ jobId: '123' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### noContent()
+
+Send a 204 No Content response.
+
+```typescript
+response.noContent()
+```
+
+**Returns:** `void`
+
+### badRequest()
+
+Send a 400 Bad Request response.
+
+```typescript
+response.badRequest({ error: 'Invalid input' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### unauthorized()
+
+Send a 401 Unauthorized response.
+
+```typescript
+response.unauthorized({ error: 'Not authenticated' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### forbidden()
+
+Send a 403 Forbidden response.
+
+```typescript
+response.forbidden({ error: 'Access denied' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### notFound()
+
+Send a 404 Not Found response.
+
+```typescript
+response.notFound({ error: 'User not found' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### methodNotAllowed()
+
+Send a 405 Method Not Allowed response.
+
+```typescript
+response.methodNotAllowed({ error: 'Method not supported' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### conflict()
+
+Send a 409 Conflict response.
+
+```typescript
+response.conflict({ error: 'Email already exists' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### unprocessableEntity()
+
+Send a 422 Unprocessable Entity response.
+
+```typescript
+response.unprocessableEntity({ errors: validationErrors })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+### internalServerError()
+
+Send a 500 Internal Server Error response.
+
+```typescript
+response.internalServerError({ error: 'Something went wrong' })
+```
+
+<ParamField path="body" type="any">
+  Response body
+</ParamField>
+
+**Returns:** `void`
+
+## Redirects
+
+### redirect()
+
+Redirect to a URL.
+
+```typescript
+response.redirect('/login')
+response.redirect('https://example.com')
+response.redirect().back()
+```
+
+<ParamField path="url" type="string">
+  URL to redirect to
+</ParamField>
+
+<ParamField path="statusCode" type="number" default="302">
+  HTTP status code for redirect
+</ParamField>
+
+**Returns:** `void`
+
+### redirectToRoute()
+
+Redirect to a named route.
+
+```typescript
+response.redirectToRoute('users.show', { id: 1 })
+```
+
+<ParamField path="routeName" type="string">
+  Name of the route
+</ParamField>
+
+<ParamField path="params" type="object">
+  Route parameters
+</ParamField>
+
+<ParamField path="options" type="object">
+  Additional options (qs, domain)
+</ParamField>
+
+**Returns:** `void`
+
+### back()
+
+Redirect back to the previous URL.
+
+```typescript
+response.redirect().back()
+```
+
+**Returns:** `void`
+
+### withQs()
+
+Add query string to redirect.
+
+```typescript
+response.redirect('/search').withQs({ q: 'adonisjs' })
+```
+
+<ParamField path="queryString" type="object">
+  Query string parameters
+</ParamField>
+
+**Returns:** `this`
+
+### clearQs()
+
+Clear query string from redirect.
+
+```typescript
+response.redirect().back().clearQs()
+```
+
+**Returns:** `this`
+
+## Headers
+
+### header()
+
+Set a response header.
+
+```typescript
+response.header('X-Custom-Header', 'value')
+```
+
+<ParamField path="key" type="string">
+  Header name
+</ParamField>
+
+<ParamField path="value" type="string">
+  Header value
+</ParamField>
+
+**Returns:** `this`
+
+### append()
+
+Append a value to a header.
+
+```typescript
+response.append('Set-Cookie', 'session=abc')
+```
+
+<ParamField path="key" type="string">
+  Header name
+</ParamField>
+
+<ParamField path="value" type="string">
+  Header value
+</ParamField>
+
+**Returns:** `this`
+
+### removeHeader()
+
+Remove a response header.
+
+```typescript
+response.removeHeader('X-Powered-By')
+```
+
+<ParamField path="key" type="string">
+  Header name
+</ParamField>
+
+**Returns:** `this`
+
+### getHeader()
+
+Get a response header value.
+
+```typescript
+const contentType = response.getHeader('Content-Type')
+```
+
+<ParamField path="key" type="string">
+  Header name
+</ParamField>
+
+**Returns:** `string | string[] | undefined`
+
+## Content Type
+
+### type()
+
+Set the Content-Type header.
+
+```typescript
+response.type('application/json')
+response.type('html')
+response.type('pdf')
+```
+
+<ParamField path="type" type="string">
+  Content type or file extension
+</ParamField>
+
+<ParamField path="charset" type="string">
+  Optional character set
+</ParamField>
+
+**Returns:** `this`
+
+### vary()
+
+Set the Vary header.
+
+```typescript
+response.vary('Accept-Encoding')
+```
+
+<ParamField path="field" type="string">
+  Header field name
+</ParamField>
+
+**Returns:** `this`
+
+## Cookies
+
+### cookie()
+
+Set a signed cookie.
+
+```typescript
+response.cookie('session_id', '123', {
+  maxAge: 3600,
+  httpOnly: true
+})
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+<ParamField path="value" type="any">
+  Cookie value
+</ParamField>
+
+<ParamField path="options" type="CookieOptions">
+  Cookie options
+  - `maxAge`: Max age in seconds
+  - `httpOnly`: HTTP only flag
+  - `secure`: Secure flag
+  - `sameSite`: SameSite policy
+  - `path`: Cookie path
+  - `domain`: Cookie domain
+</ParamField>
+
+**Returns:** `this`
+
+### plainCookie()
+
+Set a plain (unsigned) cookie.
+
+```typescript
+response.plainCookie('tracking_id', 'xyz')
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+<ParamField path="value" type="any">
+  Cookie value
+</ParamField>
+
+<ParamField path="options" type="CookieOptions">
+  Cookie options
+</ParamField>
+
+**Returns:** `this`
+
+### encryptedCookie()
+
+Set an encrypted cookie.
+
+```typescript
+response.encryptedCookie('sensitive_data', secretValue)
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+<ParamField path="value" type="any">
+  Cookie value
+</ParamField>
+
+<ParamField path="options" type="CookieOptions">
+  Cookie options
+</ParamField>
+
+**Returns:** `this`
+
+### clearCookie()
+
+Clear a cookie.
+
+```typescript
+response.clearCookie('session_id')
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+**Returns:** `this`
+
+## Caching
+
+### fresh()
+
+Check if the response should be fresh.
+
+```typescript
+if (response.fresh()) {
+  response.notModified()
+}
+```
+
+**Returns:** `boolean`
+
+### etag()
+
+Set the ETag header.
+
+```typescript
+response.etag('content-hash')
+```
+
+<ParamField path="etag" type="string">
+  ETag value
+</ParamField>
+
+<ParamField path="weak" type="boolean" default="false">
+  Use weak ETag
+</ParamField>
+
+**Returns:** `this`
+
+### notModified()
+
+Send a 304 Not Modified response.
+
+```typescript
+response.notModified()
+```
+
+**Returns:** `void`
+
+## Example Usage
+
+```typescript
+import { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async index({ response }: HttpContext) {
+    const users = await User.all()
+    
+    // JSON response
+    return response.json({
+      data: users,
+      meta: { total: users.length }
+    })
+  }
+  
+  async store({ request, response }: HttpContext) {
+    const user = await User.create(request.all())
+    
+    // Created response with location header
+    return response
+      .status(201)
+      .header('Location', `/users/${user.id}`)
+      .json({ user })
+  }
+  
+  async download({ response }: HttpContext) {
+    // File download
+    return response.download('storage/reports/report.pdf')
+  }
+  
+  async redirect({ response }: HttpContext) {
+    // Redirect with flash message
+    return response
+      .redirect()
+      .withQs({ success: 'User created' })
+      .toRoute('users.index')
+  }
+}
+```

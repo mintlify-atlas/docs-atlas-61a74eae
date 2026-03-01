@@ -1,0 +1,609 @@
+---
+title: 'Request'
+description: 'HTTP Request API reference for accessing request data in AdonisJS'
+---
+
+The `Request` class provides access to HTTP request data including headers, query parameters, request body, uploaded files, and cookies.
+
+## Importing
+
+```typescript
+import { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async index({ request }: HttpContext) {
+    // Access request
+  }
+}
+```
+
+## Properties
+
+<ParamField path="url" type="string">
+  The complete URL of the request
+</ParamField>
+
+<ParamField path="method" type="string">
+  HTTP method (GET, POST, etc.)
+</ParamField>
+
+<ParamField path="id" type="string">
+  Unique identifier for the request
+</ParamField>
+
+<ParamField path="ctx" type="HttpContext">
+  Reference to the HTTP context
+</ParamField>
+
+## URL and Path
+
+### url()
+
+Get the complete URL including query string.
+
+```typescript
+const url = request.url()
+// Returns: '/posts?page=1&limit=10'
+```
+
+<ParamField path="withQueryString" type="boolean" default="false">
+  Include query string in the URL
+</ParamField>
+
+**Returns:** `string`
+
+### completeUrl()
+
+Get the complete URL with protocol and host.
+
+```typescript
+const url = request.completeUrl()
+// Returns: 'https://example.com/posts?page=1'
+```
+
+<ParamField path="withQueryString" type="boolean" default="false">
+  Include query string in the URL
+</ParamField>
+
+**Returns:** `string`
+
+### pathname()
+
+Get the URL pathname without query string.
+
+```typescript
+const path = request.pathname()
+// Returns: '/posts'
+```
+
+**Returns:** `string`
+
+### protocol()
+
+Get the request protocol (http or https).
+
+```typescript
+const protocol = request.protocol()
+// Returns: 'https'
+```
+
+**Returns:** `string`
+
+### hostname()
+
+Get the request hostname.
+
+```typescript
+const host = request.hostname()
+// Returns: 'example.com'
+```
+
+**Returns:** `string`
+
+### host()
+
+Get the request host including port.
+
+```typescript
+const host = request.host()
+// Returns: 'example.com:3333'
+```
+
+**Returns:** `string`
+
+## Query Parameters
+
+### qs()
+
+Get all query string parameters.
+
+```typescript
+const params = request.qs()
+// Returns: { page: '1', limit: '10' }
+```
+
+**Returns:** `Record<string, any>`
+
+### input()
+
+Get a specific query parameter value.
+
+```typescript
+const page = request.input('page')
+const limit = request.input('limit', 20) // with default
+```
+
+<ParamField path="key" type="string">
+  Parameter name
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Default value if parameter is not present
+</ParamField>
+
+**Returns:** `any`
+
+## Request Body
+
+### all()
+
+Get all request body data.
+
+```typescript
+const data = request.all()
+// Returns: { name: 'John', email: 'john@example.com' }
+```
+
+**Returns:** `Record<string, any>`
+
+### body()
+
+Get the entire request body.
+
+```typescript
+const body = request.body()
+```
+
+**Returns:** `Record<string, any>`
+
+### only()
+
+Get specific fields from the request body.
+
+```typescript
+const data = request.only(['name', 'email'])
+// Returns: { name: 'John', email: 'john@example.com' }
+```
+
+<ParamField path="keys" type="string[]">
+  Array of field names to extract
+</ParamField>
+
+**Returns:** `Record<string, any>`
+
+### except()
+
+Get all fields except specified ones.
+
+```typescript
+const data = request.except(['_csrf', 'password_confirmation'])
+```
+
+<ParamField path="keys" type="string[]">
+  Array of field names to exclude
+</ParamField>
+
+**Returns:** `Record<string, any>`
+
+## Route Parameters
+
+### params()
+
+Get all route parameters.
+
+```typescript
+// Route: /posts/:id
+const params = request.params()
+// Returns: { id: '42' }
+```
+
+**Returns:** `Record<string, any>`
+
+### param()
+
+Get a specific route parameter.
+
+```typescript
+const id = request.param('id')
+```
+
+<ParamField path="key" type="string">
+  Parameter name
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Default value if parameter is not present
+</ParamField>
+
+**Returns:** `any`
+
+## Headers
+
+### headers()
+
+Get all request headers.
+
+```typescript
+const headers = request.headers()
+```
+
+**Returns:** `Record<string, string>`
+
+### header()
+
+Get a specific header value.
+
+```typescript
+const authHeader = request.header('authorization')
+const userAgent = request.header('user-agent', 'unknown')
+```
+
+<ParamField path="key" type="string">
+  Header name (case-insensitive)
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Default value if header is not present
+</ParamField>
+
+**Returns:** `string | undefined`
+
+## Cookies
+
+### cookie()
+
+Get a cookie value.
+
+```typescript
+const sessionId = request.cookie('session_id')
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Default value if cookie is not present
+</ParamField>
+
+**Returns:** `any`
+
+### plainCookie()
+
+Get a plain (unsigned) cookie value.
+
+```typescript
+const value = request.plainCookie('tracking_id')
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Default value if cookie is not present
+</ParamField>
+
+**Returns:** `any`
+
+### encryptedCookie()
+
+Get an encrypted cookie value.
+
+```typescript
+const value = request.encryptedCookie('sensitive_data')
+```
+
+<ParamField path="key" type="string">
+  Cookie name
+</ParamField>
+
+<ParamField path="defaultValue" type="any">
+  Default value if cookie is not present
+</ParamField>
+
+**Returns:** `any`
+
+### cookiesList()
+
+Get all cookies as an object.
+
+```typescript
+const cookies = request.cookiesList()
+```
+
+**Returns:** `Record<string, any>`
+
+## File Uploads
+
+### file()
+
+Get an uploaded file.
+
+```typescript
+const avatar = request.file('avatar', {
+  size: '2mb',
+  extnames: ['jpg', 'png', 'jpeg']
+})
+
+if (avatar) {
+  await avatar.move('uploads')
+}
+```
+
+<ParamField path="key" type="string">
+  Form field name
+</ParamField>
+
+<ParamField path="options" type="FileValidationOptions">
+  Validation options for the file
+  - `size`: Maximum file size
+  - `extnames`: Allowed file extensions
+</ParamField>
+
+**Returns:** `MultipartFile | null`
+
+### files()
+
+Get multiple uploaded files.
+
+```typescript
+const images = request.files('images', {
+  size: '5mb',
+  extnames: ['jpg', 'png']
+})
+
+for (const image of images) {
+  await image.move('uploads')
+}
+```
+
+<ParamField path="key" type="string">
+  Form field name
+</ParamField>
+
+<ParamField path="options" type="FileValidationOptions">
+  Validation options for the files
+</ParamField>
+
+**Returns:** `MultipartFile[]`
+
+### allFiles()
+
+Get all uploaded files.
+
+```typescript
+const files = request.allFiles()
+```
+
+**Returns:** `Record<string, MultipartFile | MultipartFile[]>`
+
+## Content Type
+
+### is()
+
+Check if the request has a specific content type.
+
+```typescript
+if (request.is(['json', 'application/json'])) {
+  // Handle JSON request
+}
+```
+
+<ParamField path="types" type="string[]">
+  Array of content types to check
+</ParamField>
+
+**Returns:** `string | boolean`
+
+### types()
+
+Get acceptable content types from the Accept header.
+
+```typescript
+const types = request.types()
+// Returns: ['application/json', 'text/html']
+```
+
+**Returns:** `string[]`
+
+### accepts()
+
+Check if the request accepts a specific content type.
+
+```typescript
+if (request.accepts(['html', 'json']) === 'json') {
+  return response.json({ data })
+}
+```
+
+<ParamField path="types" type="string[]">
+  Array of content types to check
+</ParamField>
+
+**Returns:** `string | boolean`
+
+## Request Validation
+
+### validateUsing()
+
+Validate request data using a VineJS validator.
+
+```typescript
+import { createUserValidator } from '#validators/user'
+
+const data = await request.validateUsing(createUserValidator)
+```
+
+<ParamField path="validator" type="VineValidator">
+  VineJS validator instance
+</ParamField>
+
+<ParamField path="options" type="RequestValidationOptions">
+  Optional validation options
+  - `errorReporter`: Custom error reporter
+  - `messagesProvider`: Custom messages provider
+  - `data`: Custom data to validate (defaults to request data)
+</ParamField>
+
+**Returns:** `Promise<T>`
+
+### tryValidateUsing()
+
+Validate request data without throwing errors.
+
+```typescript
+const [error, data] = await request.tryValidateUsing(createUserValidator)
+
+if (error) {
+  return response.badRequest(error.messages)
+}
+```
+
+<ParamField path="validator" type="VineValidator">
+  VineJS validator instance
+</ParamField>
+
+<ParamField path="options" type="RequestValidationOptions">
+  Optional validation options
+</ParamField>
+
+**Returns:** `Promise<[ValidationError, null] | [null, T]>`
+
+## Utilities
+
+### fresh()
+
+Check if the request is fresh (for caching).
+
+```typescript
+if (request.fresh()) {
+  response.notModified()
+}
+```
+
+**Returns:** `boolean`
+
+### stale()
+
+Check if the request is stale.
+
+```typescript
+if (request.stale()) {
+  // Regenerate content
+}
+```
+
+**Returns:** `boolean`
+
+### ajax()
+
+Check if the request is an AJAX request.
+
+```typescript
+if (request.ajax()) {
+  return response.json({ data })
+}
+```
+
+**Returns:** `boolean`
+
+### pjax()
+
+Check if the request is a PJAX request.
+
+```typescript
+if (request.pjax()) {
+  // Handle PJAX
+}
+```
+
+**Returns:** `boolean`
+
+### secure()
+
+Check if the request is over HTTPS.
+
+```typescript
+if (!request.secure()) {
+  return response.redirect(`https://${request.host()}${request.url()}`)
+}
+```
+
+**Returns:** `boolean`
+
+### ip()
+
+Get the client IP address.
+
+```typescript
+const ip = request.ip()
+```
+
+**Returns:** `string`
+
+### ips()
+
+Get all IP addresses from X-Forwarded-For header.
+
+```typescript
+const ips = request.ips()
+```
+
+**Returns:** `string[]`
+
+### subdomains()
+
+Get request subdomains.
+
+```typescript
+const subdomains = request.subdomains()
+// For 'blog.example.com': ['blog']
+```
+
+**Returns:** `string[]`
+
+## Example Usage
+
+```typescript
+import { HttpContext } from '@adonisjs/core/http'
+import { createUserValidator } from '#validators/user'
+
+export default class UsersController {
+  async store({ request, response }: HttpContext) {
+    // Validate request
+    const data = await request.validateUsing(createUserValidator)
+    
+    // Access specific fields
+    const email = request.input('email')
+    const { name, email } = request.only(['name', 'email'])
+    
+    // Handle file upload
+    const avatar = request.file('avatar', {
+      size: '2mb',
+      extnames: ['jpg', 'png']
+    })
+    
+    if (avatar) {
+      await avatar.move('uploads')
+    }
+    
+    // Check request type
+    if (request.ajax()) {
+      return response.json({ success: true })
+    }
+    
+    return response.redirect('/users')
+  }
+}
+```

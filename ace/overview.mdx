@@ -1,0 +1,258 @@
+---
+title: Ace CLI Overview
+description: Learn about Ace, the powerful command-line interface for AdonisJS applications, including its architecture, features, and how to run commands
+---
+
+Ace is the command-line interface (CLI) framework for AdonisJS applications. It provides a robust set of commands to help you develop, test, and manage your application efficiently.
+
+## Introduction
+
+Ace is built on top of the [@adonisjs/ace](https://github.com/adonisjs/ace) package and provides AdonisJS-specific functionality like dependency injection, application lifecycle management, and seamless integration with the framework's core features.
+
+Every AdonisJS application comes with a `bin/console.ts` file that serves as the entry point for Ace commands. You run commands using the `node ace` binary:
+
+```bash
+node ace serve
+node ace make:controller User
+node ace test
+```
+
+## Key Features
+
+### Dependency Injection
+
+Ace commands in AdonisJS support full dependency injection through the IoC container. This means you can inject services, repositories, and other dependencies directly into your command classes.
+
+### Application Integration
+
+Commands have direct access to the application instance (`this.app`), allowing you to:
+
+- Access configuration
+- Interact with the IoC container
+- Use application services
+- Read from `.adonisrc.ts` configuration
+
+### Interactive Prompts
+
+Ace provides built-in support for interactive prompts, allowing you to:
+
+- Ask for user input
+- Display choice menus
+- Show confirmation dialogs
+- Validate user responses
+
+### Codemods Support
+
+Many make commands use codemods to programmatically modify source files, enabling:
+
+- AST-based code transformations
+- Automatic registration in configuration files
+- Safe and reliable code generation
+
+## Running Commands
+
+### Basic Syntax
+
+The basic syntax for running Ace commands is:
+
+```bash
+node ace <command-name> [arguments] [options]
+```
+
+### Listing Available Commands
+
+To see all available commands in your application:
+
+```bash
+node ace list
+```
+
+Or simply run `node ace` without any arguments.
+
+### Getting Help
+
+To get help for a specific command:
+
+```bash
+node ace <command-name> --help
+```
+
+For example:
+
+```bash
+node ace make:controller --help
+```
+
+### Global Flags
+
+Ace supports global flags that work with all commands:
+
+#### `--ansi` / `--no-ansi`
+
+Force enable or disable colorful output:
+
+```bash
+node ace serve --no-ansi
+node ace list --ansi
+```
+
+#### `--help`
+
+Display help information for any command:
+
+```bash
+node ace serve --help
+```
+
+## Common Commands
+
+Here are some of the most commonly used Ace commands:
+
+### Development
+
+```bash
+# Start development server with file watcher
+node ace serve --watch
+
+# Start development server with HMR
+node ace serve --hmr
+```
+
+### Testing
+
+```bash
+# Run tests
+node ace test
+
+# Run tests in watch mode
+node ace test --watch
+
+# Run specific test suites
+node ace test unit integration
+```
+
+### Code Generation
+
+```bash
+# Create a controller
+node ace make:controller User
+
+# Create a middleware
+node ace make:middleware Auth
+
+# Create a service
+node ace make:service UserService
+```
+
+### Utilities
+
+```bash
+# List all routes
+node ace list:routes
+
+# Generate application key
+node ace generate:key
+
+# Open REPL
+node ace repl
+```
+
+## Ace Architecture
+
+### The Kernel
+
+The Ace Kernel is the core component that manages command execution. It:
+
+- Registers and discovers commands
+- Parses command-line arguments
+- Handles command execution lifecycle
+- Manages error handling
+- Provides UI primitives for output
+
+Learn more about the kernel in the [Kernel documentation](/ace/kernel).
+
+### Base Command
+
+All Ace commands extend the `BaseCommand` class, which provides:
+
+- Access to the application instance
+- Logger for output
+- Prompt utilities for user interaction
+- Lifecycle hooks (prepare, interact, run, completed)
+- Codemods support for code generation
+
+Learn more about creating commands in the [Commands documentation](/ace/commands).
+
+## Command Lifecycle
+
+When a command is executed, it goes through the following lifecycle:
+
+1. **Instantiation** - Command is instantiated with dependency injection
+2. **Hydration** - Arguments and flags are parsed and assigned to class properties
+3. **Prepare** - Optional `prepare()` hook is called
+4. **Interact** - Optional `interact()` hook is called for user prompts
+5. **Run** - The main `run()` method is executed
+6. **Completed** - Optional `completed()` hook is called
+7. **Error Handling** - If an error occurs, it's handled by the kernel's error handler
+
+```typescript
+import { BaseCommand } from '@adonisjs/core/ace'
+
+export default class MyCommand extends BaseCommand {
+  // 1. Properties are defined with decorators
+  @args.string()
+  declare name: string
+
+  // 2. Prepare hook - set up state
+  async prepare() {
+    // Runs before interact
+  }
+
+  // 3. Interact hook - prompts
+  async interact() {
+    // Display prompts to user
+  }
+
+  // 4. Run method - main logic
+  async run() {
+    // Command implementation
+  }
+
+  // 5. Completed hook - cleanup
+  async completed() {
+    // Runs after run() completes or fails
+    // Return true to suppress error reporting
+  }
+}
+```
+
+## Exit Codes
+
+Commands can set exit codes to indicate success or failure:
+
+```typescript
+export default class MyCommand extends BaseCommand {
+  async run() {
+    if (someCondition) {
+      this.exitCode = 1 // Failure
+      return
+    }
+    
+    this.exitCode = 0 // Success (default)
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Working with Commands" icon="code" href="/ace/commands">
+    Learn how to create and customize your own Ace commands
+  </Card>
+  <Card title="Make Commands" icon="wand-magic-sparkles" href="/ace/make-commands">
+    Explore all available make commands for code generation
+  </Card>
+  <Card title="Ace Kernel" icon="gear" href="/ace/kernel">
+    Deep dive into the Ace Kernel and command registration
+  </Card>
+</CardGroup>

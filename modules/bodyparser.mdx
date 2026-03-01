@@ -1,0 +1,457 @@
+---
+title: Bodyparser
+description: HTTP request body parsing middleware
+---
+
+The Bodyparser module re-exports all functionality from `@adonisjs/bodyparser`, providing middleware for parsing HTTP request bodies in various formats.
+
+## Import
+
+```typescript
+import { BodyParserMiddleware } from '@adonisjs/core/bodyparser'
+import type { BodyParserConfig } from '@adonisjs/core/bodyparser'
+```
+
+## Overview
+
+The Bodyparser module provides middleware for parsing incoming HTTP request bodies. It supports JSON, URL-encoded forms, multipart forms (file uploads), and raw text payloads.
+
+## Middleware
+
+### BodyParserMiddleware
+
+The main body parser middleware that automatically parses request bodies based on the Content-Type header.
+
+#### Supported Content Types
+
+<ParamField path="application/json" type="automatic">
+  Parses JSON payloads and makes them available via `request.body()`
+</ParamField>
+
+<ParamField path="application/x-www-form-urlencoded" type="automatic">
+  Parses URL-encoded form data and makes it available via `request.body()`
+</ParamField>
+
+<ParamField path="multipart/form-data" type="automatic">
+  Parses multipart form data including file uploads. Files are available via `request.file()` and other fields via `request.body()`
+</ParamField>
+
+<ParamField path="text/plain" type="automatic">
+  Parses raw text payloads and makes them available via `request.raw()`
+</ParamField>
+
+#### Registration
+
+The middleware is typically registered in the global middleware stack:
+
+```typescript
+// start/kernel.ts
+import router from '@adonisjs/core/services/router'
+import BodyParserMiddleware from '@adonisjs/core/bodyparser/bodyparser_middleware'
+
+router.use([BodyParserMiddleware])
+```
+
+## HttpContext Methods
+
+Once the bodyparser middleware is registered, the following methods become available on the `request` object:
+
+### request.body()
+
+Returns the parsed request body.
+
+<ResponseField name="return" type="object">
+  The parsed request body as an object
+</ResponseField>
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class UsersController {
+  async store({ request, response }: HttpContext) {
+    const body = request.body()
+    // body contains all form fields and JSON data
+    
+    const { name, email } = request.only(['name', 'email'])
+    // ...
+  }
+}
+```
+
+### request.file()
+
+Returns an uploaded file from a multipart request.
+
+<ParamField path="key" type="string" required>
+  The field name of the uploaded file
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional validation options
+  
+  <ParamField path="size" type="string | number">
+    Maximum file size (e.g., '2mb', 2048)
+  </ParamField>
+  
+  <ParamField path="extnames" type="string[]">
+    Allowed file extensions
+  </ParamField>
+</ParamField>
+
+<ResponseField name="return" type="MultipartFile | null">
+  The uploaded file object or null if not found
+</ResponseField>
+
+```typescript
+export default class UsersController {
+  async uploadAvatar({ request, response }: HttpContext) {
+    const avatar = request.file('avatar', {
+      size: '2mb',
+      extnames: ['jpg', 'png', 'jpeg']
+    })
+    
+    if (!avatar) {
+      return response.badRequest({ message: 'Avatar is required' })
+    }
+    
+    if (!avatar.isValid) {
+      return response.badRequest({ errors: avatar.errors })
+    }
+    
+    await avatar.move('uploads/avatars')
+  }
+}
+```
+
+### request.files()
+
+Returns all uploaded files from a multipart request.
+
+<ParamField path="key" type="string" required>
+  The field name of the uploaded files (for array uploads)
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional validation options (same as `request.file()`)
+</ParamField>
+
+<ResponseField name="return" type="MultipartFile[]">
+  Array of uploaded file objects
+</ResponseField>
+
+```typescript
+export default class PostsController {
+  async uploadImages({ request, response }: HttpContext) {
+    const images = request.files('images', {
+      size: '5mb',
+      extnames: ['jpg', 'png', 'jpeg', 'webp']
+    })
+    
+    for (const image of images) {
+      if (!image.isValid) {
+        return response.badRequest({ errors: image.errors })
+      }
+      
+      await image.move('uploads/images')
+    }
+  }
+}
+```
+
+### request.allFiles()
+
+Returns all uploaded files from all fields.
+
+<ResponseField name="return" type="object">
+  Object with field names as keys and MultipartFile objects as values
+</ResponseField>
+
+```typescript
+export default class DocumentsController {
+  async upload({ request, response }: HttpContext) {
+    const allFiles = request.allFiles()
+    
+    for (const [fieldName, file] of Object.entries(allFiles)) {
+      if (file.isValid) {
+        await file.move(`uploads/${fieldName}`)
+      }
+    }
+  }
+}
+```
+
+### request.raw()
+
+Returns the raw request body as a string.
+
+<ResponseField name="return" type="string">
+  The raw request body
+</ResponseField>
+
+```typescript
+export default class WebhooksController {
+  async handle({ request, response }: HttpContext) {
+    const rawBody = request.raw()
+    // Use raw body for signature verification
+    
+    const signature = request.header('x-webhook-signature')
+    const isValid = verifySignature(rawBody, signature)
+    
+    if (!isValid) {
+      return response.unauthorized({ message: 'Invalid signature' })
+    }
+    
+    // Process webhook
+  }
+}
+```
+
+## MultipartFile
+
+The MultipartFile class represents an uploaded file.
+
+### Properties
+
+<ParamField path="fieldName" type="string">
+  The field name used in the form
+</ParamField>
+
+<ParamField path="clientName" type="string">
+  The original filename provided by the client
+</ParamField>
+
+<ParamField path="size" type="number">
+  The file size in bytes
+</ParamField>
+
+<ParamField path="extname" type="string">
+  The file extension
+</ParamField>
+
+<ParamField path="type" type="string">
+  The MIME type of the file
+</ParamField>
+
+<ParamField path="subtype" type="string">
+  The MIME subtype
+</ParamField>
+
+<ParamField path="isValid" type="boolean">
+  Whether the file passed validation
+</ParamField>
+
+<ParamField path="errors" type="object[]">
+  Array of validation errors
+</ParamField>
+
+<ParamField path="validated" type="boolean">
+  Whether validation has been performed
+</ParamField>
+
+### Methods
+
+#### move()
+
+Moves the uploaded file to a permanent location.
+
+<ParamField path="location" type="string" required>
+  The directory path where the file should be moved
+</ParamField>
+
+<ParamField path="options" type="object">
+  Optional configuration
+  
+  <ParamField path="name" type="string">
+    Custom filename (defaults to clientName)
+  </ParamField>
+  
+  <ParamField path="overwrite" type="boolean" default="false">
+    Whether to overwrite existing files
+  </ParamField>
+</ParamField>
+
+<ResponseField name="return" type="Promise<void>">
+  A promise that resolves when the file has been moved
+</ResponseField>
+
+```typescript
+const avatar = request.file('avatar')
+await avatar.move('uploads/avatars', {
+  name: `${user.id}.${avatar.extname}`,
+  overwrite: true
+})
+```
+
+#### validate()
+
+Manually validates the file.
+
+<ResponseField name="return" type="void">
+  No return value. Check `isValid` property after calling.
+</ResponseField>
+
+```typescript
+const file = request.file('document')
+file.validate()
+
+if (!file.isValid) {
+  console.log(file.errors)
+}
+```
+
+## Configuration
+
+### BodyParserConfig
+
+Configuration type for customizing body parser behavior.
+
+```typescript
+type BodyParserConfig = {
+  allowedMethods: string[]
+  encoding: string
+  json: {
+    limit: string | number
+    strict: boolean
+    types: string[]
+  }
+  form: {
+    limit: string | number
+    types: string[]
+  }
+  raw: {
+    limit: string | number
+    types: string[]
+  }
+  multipart: {
+    autoProcess: boolean
+    processManually: string[]
+    limit: string | number
+    types: string[]
+  }
+}
+```
+
+## Example Usage
+
+### Simple Form Submission
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class ContactController {
+  async submit({ request, response }: HttpContext) {
+    const data = request.only(['name', 'email', 'message'])
+    
+    // Validate and process form data
+    await sendContactEmail(data)
+    
+    return response.json({ success: true })
+  }
+}
+```
+
+### File Upload with Validation
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import app from '@adonisjs/core/services/app'
+
+export default class UploadsController {
+  async upload({ request, response }: HttpContext) {
+    const document = request.file('document', {
+      size: '10mb',
+      extnames: ['pdf', 'doc', 'docx']
+    })
+    
+    if (!document) {
+      return response.badRequest({ message: 'Document is required' })
+    }
+    
+    if (!document.isValid) {
+      return response.badRequest({ errors: document.errors })
+    }
+    
+    const fileName = `${Date.now()}.${document.extname}`
+    await document.move(app.makePath('uploads'), { name: fileName })
+    
+    return response.json({
+      fileName,
+      size: document.size,
+      type: document.type
+    })
+  }
+}
+```
+
+### Multiple File Uploads
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+
+export default class GalleryController {
+  async uploadPhotos({ request, response }: HttpContext) {
+    const photos = request.files('photos', {
+      size: '5mb',
+      extnames: ['jpg', 'jpeg', 'png', 'webp']
+    })
+    
+    const uploadedFiles = []
+    
+    for (const photo of photos) {
+      if (!photo.isValid) {
+        return response.badRequest({ 
+          message: 'Invalid file',
+          errors: photo.errors 
+        })
+      }
+      
+      const fileName = `${Date.now()}-${photo.clientName}`
+      await photo.move('uploads/gallery', { name: fileName })
+      
+      uploadedFiles.push({
+        name: fileName,
+        size: photo.size
+      })
+    }
+    
+    return response.json({ files: uploadedFiles })
+  }
+}
+```
+
+### Processing Raw Body
+
+```typescript
+import type { HttpContext } from '@adonisjs/core/http'
+import { Hmac } from '@adonisjs/core/encryption'
+import env from '@adonisjs/core/services/env'
+
+export default class WebhookController {
+  async github({ request, response }: HttpContext) {
+    const rawBody = request.raw()
+    const signature = request.header('x-hub-signature-256')
+    
+    // Verify webhook signature using raw body
+    const hmac = new Hmac(env.get('GITHUB_WEBHOOK_SECRET'))
+    const isValid = hmac.verify(rawBody, signature)
+    
+    if (!isValid) {
+      return response.unauthorized({ message: 'Invalid signature' })
+    }
+    
+    const payload = JSON.parse(rawBody)
+    // Process webhook payload
+    
+    return response.noContent()
+  }
+}
+```
+
+## Notes
+
+- The bodyparser middleware is typically registered globally in the middleware stack
+- File uploads are automatically handled for multipart/form-data requests
+- Validation options can be specified per-file or globally in configuration
+- Large file uploads should consider using streaming for better memory efficiency
+- Raw body access is useful for webhook signature verification
+- The middleware respects the Content-Type header to determine parsing strategy
